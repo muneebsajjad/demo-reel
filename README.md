@@ -33,7 +33,8 @@ scenario.mjs ──▶ reel take ──▶ take.mov + take.json ──▶ edit.j
 - **`compose/`** — the compositor: crops the 2x recording through an eased camera, lays the overlays
   on, dissolves between scenes, cuts the sound with the picture and normalises it.
 - **`qa/`** — where the sound is (to cut in pauses), contact sheets, length and loudness.
-- **Music** — picks a bed that suits the video by default (its pace, speech and captions against
+- **Music** — ships with a small CC0 library ([library/](library/README.md), 7 tracks, 7.4 MB) and
+  picks a bed that suits the video by default (its pace, speech and captions against
   each track's measured tempo, energy and steadiness), or uses your own. Every track's licence is
   recorded and checked, the credit line to publish is written for you, and candidates can be
   auditioned under a finished render in seconds ([docs/music.md](docs/music.md)).
@@ -79,7 +80,7 @@ Early, and grown from one real video. It does browser products on macOS well. Ne
 products need them:
 
 - desktop apps (an accessibility-scripting driver; the recorder already takes any `--app`)
-- a tested local music generator (ACE-Step), and CC0 starter beds in the repo
+- a tested local music generator (ACE-Step)
 - voiceover, and burned-in subtitles of what is said
 - 16:9 and 1:1 layouts alongside 4:5
 - more card and transition templates

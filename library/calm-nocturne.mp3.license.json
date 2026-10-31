@@ -1,0 +1,16 @@
+{
+  "title": "Nocturne Op. 9 No. 2 (Chopin)",
+  "artist": "Musopen",
+  "source": "https://archive.org/details/musopen-chopin",
+  "license": "CC0-1.0",
+  "moods": [
+    "calm",
+    "warm"
+  ],
+  "original": "Nocturne Op. 9 no. 2 in E flat major.mp3",
+  "cut": {
+    "start": 110,
+    "length": 75
+  },
+  "sha256": "286d9bf0793192c1684446b2b4438de4720a0f0df011fbeb6fbb4271755a7557"
+}

@@ -1,0 +1,16 @@
+{
+  "title": "After Party",
+  "artist": "Loyalty Freak Music",
+  "source": "https://archive.org/details/ROBOTDANCE",
+  "license": "CC0-1.0",
+  "moods": [
+    "focused",
+    "upbeat"
+  ],
+  "original": "Loyalty Freak Music - ROBOT DANCE ! - 03 After Party.mp3",
+  "cut": {
+    "start": 65,
+    "length": 75
+  },
+  "sha256": "068136dc6fc6854c78bf0c96739de6953d99666caa44d29696b770e53b92a066"
+}

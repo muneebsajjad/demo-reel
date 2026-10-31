@@ -159,13 +159,17 @@ def from_openverse(p, limit=10):
                         source=r.get("foreign_landing_url") or r["url"], license=lic, popular=0))
     return out
 
-def from_folder(folder):
+LIBRARY = pathlib.Path(__file__).resolve().parent.parent / "library"
+
+def from_folder(folder, origin="yours"):
+    """Tracks in a folder that have a licence record. `origin` is "yours" or "bundled"."""
     out = []
     for t in sorted(pathlib.Path(folder).glob("*")):
         if t.suffix.lower() not in {".mp3", ".wav", ".m4a", ".flac", ".ogg"} or not music.sidecar(t).exists(): continue
         rec = json.loads(music.sidecar(t).read_text())
-        out.append(dict(id=f"local-{t.name}", path=t, title=rec.get("title", t.stem), artist=rec.get("artist", ""),
-                        source=rec.get("source", ""), license=rec.get("license"), popular=1, local=True))
+        out.append(dict(id=f"{origin}-{t.name}", path=t, title=rec.get("title", t.stem), artist=rec.get("artist", ""),
+                        source=rec.get("source", ""), license=rec.get("license"), moods=rec.get("moods", []),
+                        popular=0, origin=origin))
     return out
 
 def fetch(c):
@@ -193,40 +197,51 @@ def meta_score(c, p):
     terms["energy"] = max(0.1, 0.5 - 0.15 * c.get("words", 0))
     return sum(terms.values()), terms
 
-def pick(p, folders=(), online=True, count=3, log=print):
+GOOD_ENOUGH = 0.6     # a local track scoring this well (lower is better) means no need to search online
+
+def pick(p, folders=(), online="auto", count=3, log=print):
     """Rank candidates for profile `p`. Returns entries (score, terms, features|None, path|None, candidate),
-    best first. Tracks we may download are measured; ones a site will not hand to a script are scored
-    from their catalogue data and kept as links for the person to download."""
-    cands = [c for f in folders for c in from_folder(f)]
-    if online:
-        cands += from_ccmixter(p) + from_openverse(p)
-    seen, ranked, blocked = set(), [], 0
-    for c in cands:
-        if c["id"] in seen: continue
+    best first. Your own folders come first, then the bundled library; the internet is searched only
+    when nothing local fits well (online="auto"), always (True) or never (False). Tracks a site will
+    not hand to a script are scored from catalogue data and kept as links for the person."""
+    ranked, seen = [], set()
+
+    def consider(c):
+        if c["id"] in seen: return
         seen.add(c["id"])
         info = music.LICENSES.get(c.get("license"))
-        if not info or not info["ok"]: continue
+        if not info or not info["ok"]: return
         try:
             path = fetch(c)
         except urllib.error.HTTPError as e:
             if e.code in (401, 403, 429):                      # the site does not allow scripted downloads
                 s, terms = meta_score(c, p)
                 ranked.append((round(s - 0.15 * c.get("popular", 0) + 0.2, 3), terms, None, None, c))
-                blocked += 1; continue
-            log(f"  skip {c['title'][:40]}: {e}"); continue
+                return "blocked"
+            log(f"  skip {c['title'][:40]}: {e}"); return
         except Exception as e:
-            log(f"  skip {c['title'][:40]}: {e}"); continue
+            log(f"  skip {c['title'][:40]}: {e}"); return
         f = features(path)
-        if not f: continue
+        if not f: return
         s, terms = score(f, p)
-        s -= 0.15 * c.get("popular", 0) + (0.3 if c.get("local") else 0)   # prefer your own library a little
+        s -= 0.15 * c.get("popular", 0)
+        s -= {"yours": 0.3, "bundled": 0.1}.get(c.get("origin"), 0)       # your own music first
+        if p["mood"] in c.get("moods", []): s -= 0.35                        # tagged for this mood
         ranked.append((round(s, 3), terms, f, path, c))
-    if blocked: log(f"  {blocked} tracks could not be downloaded by script; they are ranked from their catalogue data")
+
+    for f in folders: [consider(c) for c in from_folder(f, "yours")]
+    if LIBRARY.exists(): [consider(c) for c in from_folder(LIBRARY, "bundled")]
+    best_local = min((r[0] for r in ranked), default=9)
+    if online is True or (online == "auto" and best_local > GOOD_ENOUGH):
+        log("  searching online: nothing local fits well enough" if online == "auto" else "  searching online")
+        blocked = sum(consider(c) == "blocked" for c in from_ccmixter(p) + from_openverse(p))
+        if blocked: log(f"  {blocked} tracks could not be downloaded by script; they are ranked from their catalogue data")
     ranked.sort(key=lambda r: r[0])
     return ranked                                     # everything, best first; callers show the top few
 
 def describe(entry, p):
     s, terms, f, path, c = entry
+    where = {"yours": "your music", "bundled": "bundled"}.get(c.get("origin"), "online")
     if f is None:
         bpm = f"{c['bpm']:>5.0f} bpm" if c.get("bpm") else "  ? bpm"
         return (f"{c['title'][:44]:<44} {c['license']:<10} {bpm}  score {s:.2f}  "
@@ -234,5 +249,5 @@ def describe(entry, p):
     worst = max(terms, key=terms.get)
     why = {"tempo": "tempo off", "energy": "energy off", "swing": "swells in volume", "length": "shorter than the video",
            "voice": "busy under a voice", "intro": "long intro"}[worst] if terms[worst] > 0.25 else "close fit"
-    return (f"{c['title'][:44]:<44} {c['license']:<10} {f['bpm']:>5.0f} bpm  energy {f['energy']:.2f} "
+    return (f"{c['title'][:40]:<40} {where:<10} {c['license']:<10} {f['bpm']:>5.0f} bpm  energy {f['energy']:.2f} "
             f"(want {p['energy']:.2f})  score {s:.2f}  [{why}]")

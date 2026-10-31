@@ -1,0 +1,16 @@
+{
+  "title": "One Cool Minute",
+  "artist": "Loyalty Freak Music",
+  "source": "https://archive.org/details/MINIMALAMBIENTBOUNCE",
+  "license": "CC0-1.0",
+  "moods": [
+    "upbeat",
+    "energetic"
+  ],
+  "original": "Loyalty Freak Music - MINIMAL AMBIENT BOUNCE - 02 One Cool Minute.mp3",
+  "cut": {
+    "start": 100,
+    "length": 75
+  },
+  "sha256": "fc60c2f0a4a6d974f11d6847d6eb279081f40e7a9e66a1a296e3d1e56fe55d12"
+}

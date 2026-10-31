@@ -1,0 +1,16 @@
+{
+  "title": "Chill Out Theme",
+  "artist": "Komiku",
+  "source": "https://archive.org/details/Komiku-ItsTimeForAdventureVol2",
+  "license": "CC0-1.0",
+  "moods": [
+    "warm",
+    "focused"
+  ],
+  "original": "Komiku_-_02_-_Chill_Out_Theme.mp3",
+  "cut": {
+    "start": 90,
+    "length": 75
+  },
+  "sha256": "f7bd58660258e281dccdf427a2398e58dd0c37823fed113d3b1e3ece58bdf921"
+}

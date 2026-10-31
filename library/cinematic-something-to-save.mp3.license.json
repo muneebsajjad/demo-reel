@@ -1,0 +1,15 @@
+{
+  "title": "Something to save",
+  "artist": "Komiku",
+  "source": "https://archive.org/details/Komiku-ItsTimeForAdventureVol2",
+  "license": "CC0-1.0",
+  "moods": [
+    "cinematic"
+  ],
+  "original": "Komiku_-_10_-_Something_to_save.mp3",
+  "cut": {
+    "start": 25,
+    "length": 75
+  },
+  "sha256": "e928769b67ddb3ee172aae643922696e5270f5546e84029b701fad286012d6cf"
+}

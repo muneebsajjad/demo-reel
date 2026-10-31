@@ -313,7 +313,7 @@ def auto_music(spec, voice, sr):
     print(f"video: {p['length']:.0f}s, voice {p['voice']:.0%} of it, {p['pace']} changes/min -> "
           f"mood {p['mood']}, energy {p['energy']}, {p['bpm'][0]}-{p['bpm'][1]} bpm")
     folders = [BASE / f for f in spec.get("folders", ["music"])]
-    ranked = autopick.pick(p, folders, online=spec.get("online", True), count=PICK_COUNT)
+    ranked = autopick.pick(p, folders, online=spec.get("online", "auto"), count=PICK_COUNT)
     if not ranked:
         if PICK_ONLY: raise SystemExit("no usable music found: add your own with `reel music add`, or set music to null")
         print("music: nothing suitable found; rendering without music"); return None

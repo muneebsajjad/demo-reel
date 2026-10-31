@@ -13,8 +13,11 @@ With no `music` in the edit, the system picks a bed for the video:
    energy and a tempo range. Set `"music": { "auto": true, "mood": "upbeat" }` to choose the mood
    yourself.
 2. **It gathers licensed candidates**: tracks in your `music/` folder that have a licence record
-   first, then instrumental CC BY / CC0 tracks from ccMixter (and Openverse, when its audio search
-   is up). Non-commercial and no-derivatives licences are never considered.
+   first, then the **bundled library** (seven CC0 beds covering calm, focused, warm, upbeat,
+   energetic and cinematic — see `library/README.md`). Only when nothing local fits well does it
+   search online: instrumental CC BY / CC0 tracks from ccMixter (and Openverse, when its audio
+   search is up). Non-commercial and no-derivatives licences are never considered. Set
+   `"online": false` to stay offline, or `true` to always look further.
 3. **It measures each track it may download**: tempo, energy, brightness, how much the volume
    swells, how busy it is, the length of the intro. It scores them against the video: tempo and
    energy close to the target, steady volume, not busy under speech, long enough not to loop.

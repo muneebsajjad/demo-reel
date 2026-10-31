@@ -100,8 +100,9 @@ plainly what is real and what was changed for recording.
 ## Music
 
 By default the system picks a bed that suits the video (`docs/music.md`): it profiles the video
-(length, speech, pace, caption words), ranks licensed instrumental candidates by measured tempo,
-energy and steadiness, and keeps the best. Run `reel music auto edit.json --audition renders/x.mp4`
+(length, speech, pace, caption words), ranks licensed instrumental candidates — the person's own
+`music/` folder, then the bundled CC0 library (`library/`), then online only if nothing local
+fits — by measured tempo, energy and steadiness, and keeps the best. Run `reel music auto edit.json --audition renders/x.mp4`
 to see the ranking and get a preview of the top tracks. You cannot hear, so hand the previews to the
 person before calling the video done. When the best tracks are link-only (the site blocks scripted
 downloads), give the person the links; they download one and run `reel music add <file> --candidate N`.

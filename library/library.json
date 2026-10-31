@@ -1,0 +1,78 @@
+[
+  {
+    "file": "calm-no-cadillac.mp3",
+    "title": "No Cadillac",
+    "artist": "Loyalty Freak Music",
+    "moods": [
+      "calm",
+      "focused"
+    ],
+    "license": "CC0-1.0",
+    "source": "https://archive.org/details/MINIMALAMBIENTBOUNCE"
+  },
+  {
+    "file": "calm-nocturne.mp3",
+    "title": "Nocturne Op. 9 No. 2 (Chopin)",
+    "artist": "Musopen",
+    "moods": [
+      "calm",
+      "warm"
+    ],
+    "license": "CC0-1.0",
+    "source": "https://archive.org/details/musopen-chopin"
+  },
+  {
+    "file": "focused-waiting.mp3",
+    "title": "Waiting TTTT",
+    "artist": "Loyalty Freak Music",
+    "moods": [
+      "focused",
+      "calm"
+    ],
+    "license": "CC0-1.0",
+    "source": "https://archive.org/details/MINIMALAMBIENTBOUNCE"
+  },
+  {
+    "file": "focused-after-party.mp3",
+    "title": "After Party",
+    "artist": "Loyalty Freak Music",
+    "moods": [
+      "focused",
+      "upbeat"
+    ],
+    "license": "CC0-1.0",
+    "source": "https://archive.org/details/ROBOTDANCE"
+  },
+  {
+    "file": "warm-chill-out.mp3",
+    "title": "Chill Out Theme",
+    "artist": "Komiku",
+    "moods": [
+      "warm",
+      "focused"
+    ],
+    "license": "CC0-1.0",
+    "source": "https://archive.org/details/Komiku-ItsTimeForAdventureVol2"
+  },
+  {
+    "file": "upbeat-one-cool-minute.mp3",
+    "title": "One Cool Minute",
+    "artist": "Loyalty Freak Music",
+    "moods": [
+      "upbeat",
+      "energetic"
+    ],
+    "license": "CC0-1.0",
+    "source": "https://archive.org/details/MINIMALAMBIENTBOUNCE"
+  },
+  {
+    "file": "cinematic-something-to-save.mp3",
+    "title": "Something to save",
+    "artist": "Komiku",
+    "moods": [
+      "cinematic"
+    ],
+    "license": "CC0-1.0",
+    "source": "https://archive.org/details/Komiku-ItsTimeForAdventureVol2"
+  }
+]
