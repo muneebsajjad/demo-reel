@@ -42,6 +42,8 @@ if _problems:
 
 W, H = EDIT.get("size", [1080, 1350])
 FPS = EDIT.get("fps", 30)
+DRAFT = "--draft" in args                           # quick preview: half the frames, a fast encoder
+if DRAFT: FPS = max(10, FPS // 2)
 XF = EDIT.get("transition", 0.4)
 TAKE = BASE / (EDIT["take"] + ".mov")
 LOG = json.loads((BASE / (EDIT["take"] + ".json")).read_text())
@@ -99,9 +101,10 @@ def take_view(si, local):
         acc += b - a
     if (si, piece) not in readers:
         a, b = s["take"][piece]
-        readers[(si, piece)] = Reader(a - XF, (b - a) + 2 * XF + 0.3)
+        start = max(a - XF, st - 0.1)               # a chunk may begin in the middle of a scene
+        readers[(si, piece)] = Reader(start, (b + XF + 0.3) - start)
     img = readers[(si, piece)].at(st)
-    view = img.resize((VW, VH), Image.LANCZOS, box=GEO.box(*GEO.camera(s["camera"], st)))
+    view = img.resize((VW, VH), Image.LANCZOS, box=GEO.box(*GEO.camera(s["camera"], st)), reducing_gap=2.0)
     return np.asarray(view).astype(np.float32) / 255
 
 def window_with(view):
@@ -109,16 +112,36 @@ def window_with(view):
     out[VY:VY + VH, VX:VX + VW] = out[VY:VY + VH, VX:VX + VW] * (1 - VMASK) + view * VMASK
     return out
 
-def over(dst, src, alpha=1.0, dy=0):
-    if dy: src = np.roll(src, int(round(dy)), 0)
-    a = src[..., 3:4] * alpha
-    return dst * (1 - a) + src[..., :3] * a
+class Overlay:
+    """A full-canvas RGBA layer kept as just the box where it has any alpha: blending a caption
+    then touches a strip of the frame, not all of it."""
+    def __init__(self, rgba):
+        ys, xs = np.nonzero(rgba[..., 3] > 0)
+        if len(ys) == 0:
+            self.y0 = self.y1 = self.x0 = self.x1 = 0; self.rgb = self.a = None; return
+        self.y0, self.y1, self.x0, self.x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
+        box = rgba[self.y0:self.y1, self.x0:self.x1]
+        self.rgb, self.a = np.ascontiguousarray(box[..., :3]), np.ascontiguousarray(box[..., 3:4])
+
+def over(dst, ov, alpha=1.0, dy=0):
+    """Blend overlay `ov` onto `dst` in place, shifted down by `dy` px."""
+    if ov.rgb is None or alpha <= 0: return dst
+    dy = int(round(dy))
+    y0, y1 = ov.y0 + dy, ov.y1 + dy
+    c0, c1 = max(0, -y0), (ov.y1 - ov.y0) - max(0, y1 - dst.shape[0])
+    y0, y1 = max(0, y0), min(dst.shape[0], y1)
+    if y1 <= y0: return dst
+    a = ov.a[c0:c1] * alpha
+    reg = dst[y0:y1, ov.x0:ov.x1]
+    reg *= 1 - a
+    reg += ov.rgb[c0:c1] * a
+    return dst
 
 def push(layer, k):
-    if abs(k - 1) < 1e-4: return layer[..., :3]
+    if abs(k - 1) < 1e-4: return layer[..., :3].copy()          # callers draw on it
     im = Image.fromarray((layer[..., :3] * 255).astype(np.uint8))
     w, h = W / k, H / k
-    im = im.resize((W, H), Image.LANCZOS, box=((W - w) / 2, (H - h) / 2, (W + w) / 2, (H + h) / 2))
+    im = im.resize((W, H), Image.BICUBIC, box=((W - w) / 2, (H - h) / 2, (W + w) / 2, (H + h) / 2))
     return np.asarray(im).astype(np.float32) / 255
 
 # ---- image scenes: stills of the product over the dimmed window, optionally revealing a second ---
@@ -185,24 +208,26 @@ class ImageScene:
 images = {i: ImageScene(s) for i, s in enumerate(SCENES) if "images" in s}
 cards = {s["card"]: load(LAYERS / f"{s['card']}.png") for s in SCENES if s.get("card")}
 SUBS = json.loads((LAYERS / "subtitles.json").read_text()) if (LAYERS / "subtitles.json").exists() else []
-overlays = {c["id"]: load(LAYERS / f"{c['id']}.png") for c in SUBS}
+overlays = {c["id"]: Overlay(load(LAYERS / f"{c['id']}.png")) for c in SUBS}
 for s in SCENES:
     for c in s.get("captions", []) + s.get("toasts", []):
-        overlays[c["id"]] = load(LAYERS / f"{c['id']}.png")
+        overlays[c["id"]] = Overlay(load(LAYERS / f"{c['id']}.png"))
 
-last_view = None                     # the most recent window content, for image scenes to sit over
+def behind(si):
+    """The last view of the take scene before scene `si`, for an image scene to sit over."""
+    j = next((j for j in range(si - 1, -1, -1) if "take" in SCENES[j]), None)
+    return take_view(j, SCENES[j]["dur"] - 0.01) if j is not None else None
+
 def scene_frame(si, local):
-    global last_view
     s = SCENES[si]
     if s.get("card"):
         k = s.get("push", 0.022)
         if si == len(SCENES) - 1: return push(cards[s["card"]], 1 + k - k * ease(local / 1.2))
         return push(cards[s["card"]], 1 + k * ease(local / s["dur"]))
     if "take" in s:
-        v = take_view(si, local)
-        last_view = v
-        return window_with(v)
-    return images[si].frame(local, last_view)
+        return window_with(take_view(si, local))
+    img = images[si]
+    return img.frame(local, behind(si) if img.backdrop is None else None)
 
 DIP = None
 def frame(t):
@@ -342,12 +367,37 @@ def loudnorm_args(path, target):
 if STILLS:
     (BUILD / "stills").mkdir(parents=True, exist_ok=True)
     for t in STILLS:
-        # image scenes need the window content that came before them
-        for si, s in enumerate(SCENES):
-            if "take" in s and s["start"] + s["dur"] <= t: scene_frame(si, s["dur"] - 0.01)
         Image.fromarray((frame(t) * 255).clip(0, 255).astype(np.uint8)).save(BUILD / "stills" / f"{t:06.2f}.png")
         readers.clear()
         print("still", t)
+    sys.exit()
+
+import os
+X264 = ["-c:v", "libx264", "-preset", "veryfast" if DRAFT else os.environ.get("REEL_PRESET", "slow"),
+        "-crf", "22" if DRAFT else "16", "-profile:v", "high", "-pix_fmt", "yuv420p"]
+N_FRAMES = int(round(TOTAL * FPS))
+if "--limit-frames" in args:                        # a quick partial render, e.g. for timing
+    N_FRAMES = min(N_FRAMES, int(args[args.index("--limit-frames") + 1]))
+
+def encode(first, last, out, audio_args=()):
+    """Frames [first, last) into `out`, with x264 (and the sound, when given)."""
+    enc = subprocess.Popen(["ffmpeg", "-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24",
+                            "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-", *audio_args, *X264, str(out)],
+                           stdin=subprocess.PIPE)
+    rng = np.random.default_rng(0)
+    noise = [(rng.random((H, W, 1), np.float32) - 0.5) / 255 for _ in range(8)]   # dither: no banding
+    for i in range(first, last):
+        f = frame(i / FPS) + noise[i % 8]
+        enc.stdin.write((f * 255).clip(0, 255).astype(np.uint8).tobytes())
+        if "--segment" not in args and i % 90 == 0: print(f"frame {i}/{last}", flush=True)
+    enc.stdin.close()
+    if enc.wait() != 0: raise SystemExit(f"encoding failed; {OUT} was left as it was")
+
+# --segment k/N --seg-out file: a worker renders its share of the frames, picture only
+if "--segment" in args:
+    k, N = map(int, args[args.index("--segment") + 1].split("/"))
+    first, last = N_FRAMES * k // N, N_FRAMES * (k + 1) // N
+    encode(first, last, pathlib.Path(args[args.index("--seg-out") + 1]))
     sys.exit()
 
 OUT.parent.mkdir(parents=True, exist_ok=True)
@@ -370,18 +420,33 @@ PART = OUT.with_name(f".{OUT.stem}.{__import__('os').getpid()}.part.mp4")   # wr
 SRT = BASE / EDIT["baseBuild"] / "subtitles.srt"
 if SRT.exists():                                    # always offer the caption file beside the video
     import shutil; shutil.copy(SRT, OUT.with_suffix(".srt")); print("subtitles:", OUT.with_suffix(".srt"))
-enc = subprocess.Popen(["ffmpeg", "-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24",
-                        "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-", "-i", str(audio), "-af", af,
-                        "-c:v", "libx264", "-preset", "slow", "-crf", "16", "-profile:v", "high", "-pix_fmt", "yuv420p",
-                        "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart", str(PART)],
-                       stdin=subprocess.PIPE)
-n = int(round(TOTAL * FPS))
-rng = np.random.default_rng(0)
-for i in range(n):
-    f = frame(i / FPS) + (rng.random((H, W, 1), np.float32) - 0.5) / 255     # dither: no banding
-    enc.stdin.write((f * 255).clip(0, 255).astype(np.uint8).tobytes())
-    if i % 90 == 0: print(f"frame {i}/{n}", flush=True)
-enc.stdin.close()
-if enc.wait() != 0: raise SystemExit(f"encoding failed; {OUT} was left as it was")
+# chunks in parallel: each worker is this script on a share of the frames; joined without re-encoding
+JOBS = int(args[args.index("--jobs") + 1]) if "--jobs" in args else int(os.environ.get("REEL_JOBS", 0)) or \
+    max(1, min(4, (os.cpu_count() or 2) // 3))
+JOBS = max(1, min(JOBS, N_FRAMES // 30))            # at least 30 frames per chunk
+if JOBS == 1:
+    encode(0, N_FRAMES, PART, ["-i", str(audio), "-af", af, "-c:a", "aac", "-b:a", "192k", "-shortest",
+                               "-movflags", "+faststart"])
+else:
+    import tempfile, time
+    tmp = pathlib.Path(tempfile.mkdtemp(prefix="reel-", dir=OUT.parent))
+    segs = [tmp / f"{k:02d}.mp4" for k in range(JOBS)]
+    base_args = list(sys.argv[1:])
+    for flag in ("--out", "--jobs"):                # workers get their own output; no nested chunking
+        while flag in base_args:
+            i = base_args.index(flag); del base_args[i:i + 2]
+    t0 = time.time()
+    print(f"rendering {N_FRAMES} frames in {JOBS} parallel chunks", flush=True)
+    workers = [subprocess.Popen([sys.executable, __file__, *base_args, "--out", str(OUT),
+                                 "--segment", f"{k}/{JOBS}", "--seg-out", str(seg)]) for k, seg in enumerate(segs)]
+    codes = [w.wait() for w in workers]
+    if any(codes):
+        raise SystemExit(f"a render chunk failed (exit codes {codes}); {OUT} was left as it was")
+    (tmp / "list.txt").write_text("".join(f"file '{seg.name}'\n" for seg in segs))
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(tmp / "list.txt"),
+                    "-i", str(audio), "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-af", af,
+                    "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart", str(PART)], check=True)
+    import shutil; shutil.rmtree(tmp)
+    print(f"chunks rendered and joined in {time.time() - t0:.0f}s")
 PART.replace(OUT)                                   # only a finished render ever takes the name
 print("wrote", OUT, f"{TOTAL:.2f}s")

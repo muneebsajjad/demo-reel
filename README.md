@@ -33,7 +33,8 @@ scenario.mjs ──▶ reel take ──▶ take.mov + take.json ──▶ edit.j
 - **`layers/`** — HTML templates for the window frame, captions, key toasts, title and end cards,
   rendered by Chrome with your brand colours and logo.
 - **`compose/`** — the compositor: crops the 2x recording through an eased camera, lays the overlays
-  on, dissolves between scenes, cuts the sound with the picture and normalises it.
+  on, dissolves between scenes, cuts the sound with the picture and normalises it. It renders in
+  parallel chunks (about 3 minutes for 30 seconds of 4:5 on a 6-core laptop; `--draft` for previews).
 - **`qa/`** — where the sound is (to cut in pauses), contact sheets, length and loudness.
 - **Formats and subtitles** — one edit renders 4:5, 1:1, 9:16 and 16:9; what is said is
   transcribed locally into an editable `.srt`, exported with every render and optionally burned in.

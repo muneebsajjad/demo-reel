@@ -37,6 +37,41 @@ b {{ color: var(--accent); }}
 {css}
 </style></head><body>{body}</body></html>"""
 
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+def playwright_browser():
+    """Playwright's headless shell (or Chrome for Testing). Branded Chrome's headless mode stops
+    painting partway down a tall page on some Macs, so it is the last resort for one-session shots."""
+    import os, glob
+    for root in [os.path.expanduser("~/Library/Caches/ms-playwright"), os.path.expanduser("~/.cache/ms-playwright")]:
+        for pattern in ["chromium_headless_shell-*/chrome-headless-shell-*/chrome-headless-shell",
+                        "chromium_headless_shell-*/chrome-*/headless_shell",
+                        "chromium-*/chrome-mac*/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+                        "chromium-*/chrome-linux/chrome"]:
+            hits = sorted(glob.glob(os.path.join(root, pattern)))
+            if hits: return hits[-1]
+    return None
+
+def shoot(exe, todo):
+    """Screenshot the layers: all in one browser session when playwright-core is installed, else one
+    headless Chrome per layer (slower: each launch costs a few seconds)."""
+    if not todo: return
+    for j in todo: pathlib.Path(j["png"]).unlink(missing_ok=True)
+    pw = playwright_browser()
+    if pw and (ROOT / "node_modules" / "playwright-core").exists() and shutil.which("node"):
+        jobs = pathlib.Path(todo[0]["png"]).parent / "shoot.json"
+        jobs.write_text(json.dumps(todo))
+        r = subprocess.run(["node", str(ROOT / "layers/shoot.mjs"), str(jobs)], capture_output=True, text=True,
+                           env={**__import__("os").environ, "CHROME": pw})
+        if r.returncode == 0:
+            print(r.stdout.strip()); return
+        print("one-session screenshots failed, falling back:", (r.stderr or r.stdout).strip().splitlines()[-1:])
+    for j in todo:
+        subprocess.run([exe, "--headless=new", "--disable-gpu", "--hide-scrollbars", "--force-device-scale-factor=1",
+                        "--default-background-color=00000000", f"--window-size={j['width']},{j['height']}",
+                        f"--screenshot={j['png']}", pathlib.Path(j["html"]).as_uri()], capture_output=True)
+        print("layer", j["name"], "ok" if pathlib.Path(j["png"]).exists() else "FAILED")
+
 def render(edit_path, fmt=None):
     edit_path = pathlib.Path(edit_path).resolve()
     edit = layout.resolve(json.loads(edit_path.read_text()), fmt)
@@ -71,15 +106,19 @@ def render(edit_path, fmt=None):
         print(f"subtitles: burn is on but {srt} does not exist; run `reel subtitles` first")
     (out / "subtitles.json").write_text(json.dumps(cues, indent=1))
     exe = chrome()
+    skipped, todo = 0, []
     for name, job in jobs.items():
         if job is None: continue
         css, body = job
         f = out / f"{name}.html"
-        f.write_text(page(css, body, brand, size))
-        subprocess.run([exe, "--headless=new", "--disable-gpu", "--hide-scrollbars", "--force-device-scale-factor=1",
-                        "--default-background-color=00000000", f"--window-size={size[0]},{size[1]}",
-                        f"--screenshot={out / (name + '.png')}", f.as_uri()], capture_output=True)
-        print("layer", name, "ok" if (out / f"{name}.png").exists() else "FAILED")
+        html_text = page(css, body, brand, size)
+        png = out / f"{name}.png"
+        if f.exists() and png.exists() and f.read_text() == html_text and png.stat().st_mtime >= f.stat().st_mtime:
+            skipped += 1; continue                  # unchanged since the last render
+        f.write_text(html_text)
+        todo.append(dict(name=name, html=str(f), png=str(png), width=size[0], height=size[1]))
+    shoot(exe, todo)
+    if skipped: print(f"{skipped} layer{'s' * (skipped != 1)} unchanged")
     # the compositor reads ids back from here
     (out / "index.json").write_text(json.dumps(edit["scenes"], indent=1))
 

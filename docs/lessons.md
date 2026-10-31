@@ -77,3 +77,20 @@ What a click-and-drag product with no sound changed:
   and the length, chose a bundled bed offline and set it louder than it would sit under speech.
 - **Wait for the page, then act through its controls.** Clicking by `title` / `aria-label`
   survived the panel appearing in a different place than in the probe.
+
+## Speed
+
+- **Measure before optimising.** A profile showed the time in full-frame overlay blends (a caption
+  covers a strip, but every pixel was blended), Lanczos resizes and fresh dither noise every frame.
+  Blending only each overlay's box and reusing a few noise frames cut a quarter of the frame time.
+- **Chunks in parallel, joined without re-encoding.** Workers render frame ranges with the same
+  encoder settings; the concat demuxer joins them and the sound is added once. Workers must not
+  depend on earlier frames: readers start near their chunk, and an image scene finds its backdrop
+  itself. Four chunks were as fast as six on 6 cores: the work is CPU-bound by then.
+- **Check alignment where things move.** A frame-matching test said two chunk starts were shifted;
+  they fell in still moments where every neighbour matches. Where there is motion, the match is exact.
+- **One browser for all the layers.** Seventeen Chrome launches took 77 s; one session takes 6 s.
+  Branded Chrome's headless mode stopped painting 88 px short of a 1350 px page on this Mac, so
+  layer shots use Playwright's headless shell. Unchanged layers are not rendered again at all.
+- **macOS ships bash 3.2**, where an empty array under `set -u` is an error: `reel render` without
+  `--format` failed. Expand optional arrays as `${a[@]+"${a[@]}"}`.

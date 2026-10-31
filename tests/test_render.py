@@ -105,3 +105,27 @@ def test_sound_lands_where_the_edit_puts_it(rendered):
     assert rms(0.65, 1.35) > 0.05
     assert rms(0.0, 0.4) < rms(0.65, 1.35) / 20
     assert rms(1.65, 2.4) < rms(0.65, 1.35) / 20
+
+def test_parallel_chunks_match_a_single_process_render(tmp_path_factory):
+    """Rendering in chunks must give the same video as one process: same length, same frames."""
+    d = tmp_path_factory.mktemp("parallel")
+    make_take(d)
+    edit = {**EDIT, "fps": 30, "subtitles": None}
+    (d / "edit.json").write_text(json.dumps(edit))
+    py = sys.executable
+    subprocess.run([py, str(ROOT / "layers/render.py"), str(d / "edit.json")], check=True, capture_output=True)
+    outs = {}
+    for jobs in (1, 2):
+        out = d / f"out{jobs}.mp4"
+        r = subprocess.run([py, str(ROOT / "compose/compose.py"), str(d / "edit.json"), "--out", str(out),
+                            "--jobs", str(jobs)], capture_output=True, text=True)
+        assert r.returncode == 0, r.stdout + r.stderr
+        if jobs == 2: assert "2 parallel chunks" in r.stdout
+        outs[jobs] = out
+    count = lambda v: int(subprocess.run(["ffprobe", "-v", "error", "-count_frames", "-select_streams", "v:0",
+                                          "-show_entries", "stream=nb_read_frames", "-of", "csv=p=0", str(v)],
+                                         capture_output=True, text=True).stdout)
+    assert count(outs[1]) == count(outs[2]) == 78
+    for t in (0.5, 1.29, 1.31, 2.2):                    # around the chunk boundary (frame 39) and either side
+        a, b = frame_at(outs[1], t), frame_at(outs[2], t)
+        assert 10 * np.log10(255 ** 2 / max(((a - b) ** 2).mean(), 1e-9)) > 35

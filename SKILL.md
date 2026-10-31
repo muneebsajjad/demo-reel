@@ -104,6 +104,13 @@ Write `edit.json` (reference: `docs/edit-format.md`). Rules that make it look ma
 - **Let moves breathe:** 1.0–1.5 s per camera move, hold at least 1.5 s after it lands.
 - Title card 2–2.5 s, end card 3–3.5 s. Image scenes (a popup, a settings panel) 3–4 s.
 
+## Speed
+
+A 30-second 4:5 render takes about 3 minutes on a 6-core laptop: frames render in parallel chunks
+(4 by default; `--jobs N`), joined without re-encoding, and unchanged layers are reused. While the
+edit is still moving, use `reel render … --draft` (15 fps, fast encoder, about half the time) and
+`reel stills`; render the real thing once the stills look right.
+
 ## 4. Check, every time
 
 1. `bin/reel layers` and `bin/reel stills` at the start, middle and end of every scene and at each

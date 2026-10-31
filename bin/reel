@@ -7,7 +7,8 @@
 #   reel check  <edit.json>             find problems in an edit before rendering
 #   reel layers <edit.json>             render the overlay layers (captions, cards, frame)
 #   reel stills <edit.json> <t,t,...> [--format F]   preview frames, in <build>/stills/
-#   reel render <edit.json> [out.mp4] [--format 4:5|1:1|9:16|16:9|all]   render the video
+#   reel render <edit.json> [out.mp4] [--format 4:5|1:1|9:16|16:9|all] [--draft] [--jobs N]
+#                                       render the video (in parallel chunks; --draft: fast preview)
 #   reel sheet  <video.mp4> <t,t,...>   contact sheet, length and loudness of a render
 #   reel music  add|list|audition|generate|auto   music with its licence recorded (reel music -h)
 #   reel subtitles <edit.json> [--again]   transcribe what is said (locally) into <build>/subtitles.srt
@@ -30,17 +31,19 @@ case "$cmd" in
   stills) edit=$1 times=$2; shift 2
           "${PY[@]}" "$ROOT/layers/render.py" "$edit" "$@" >/dev/null && "${PY[@]}" "$ROOT/compose/compose.py" "$edit" --stills "$times" "$@" ;;
   render) edit=$1; shift; out=""; fmt=""
-          while [ $# -gt 0 ]; do case "$1" in --format) fmt=$2; shift 2 ;; *) out=$1; shift ;; esac; done
+          extra=()
+          while [ $# -gt 0 ]; do case "$1" in --format) fmt=$2; shift 2 ;; --draft) extra+=(--draft); shift ;;
+                                              --jobs) extra+=(--jobs "$2"); shift 2 ;; *) out=$1; shift ;; esac; done
           if [ "$fmt" = all ]; then
             fmts=$("${PY[@]}" -c "import json,sys; e=json.load(open(sys.argv[1])); print(' '.join(e.get('formats', ['4:5','1:1','9:16','16:9'])))" "$edit")
           else fmts=${fmt:-own}; fi
           for f in $fmts; do
             fa=(); [ "$f" != own ] && fa=(--format "$f")
             o=(); if [ -n "$out" ]; then if [ "$fmt" = all ]; then o=(--out "${out%.*}-${f/:/x}.${out##*.}"); else o=(--out "$out"); fi; fi
-            "${PY[@]}" "$ROOT/layers/render.py" "$edit" "${fa[@]}" >/dev/null && "${PY[@]}" "$ROOT/compose/compose.py" "$edit" "${fa[@]}" "${o[@]}" || exit 1
+            "${PY[@]}" "$ROOT/layers/render.py" "$edit" ${fa[@]+"${fa[@]}"} >/dev/null && "${PY[@]}" "$ROOT/compose/compose.py" "$edit" ${fa[@]+"${fa[@]}"} ${o[@]+"${o[@]}"} ${extra[@]+"${extra[@]}"} || exit 1
           done ;;
   sheet)  "$ROOT/qa/sheet.sh" "$@" ;;
   music)  "${PY[@]}" "$ROOT/compose/music_cli.py" "$@" ;;
   subtitles) uv run --no-project --quiet --with numpy --with faster-whisper python "$ROOT/compose/subtitles.py" "$@" ;;
-  *) sed -n '2,13p' "$0" ;;
+  *) sed -n '2,14p' "$0" ;;
 esac
