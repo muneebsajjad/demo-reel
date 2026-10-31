@@ -1,0 +1,27 @@
+#!/bin/bash
+# reel: one entry point for every step.
+#   reel setup                          build the recorder, install Node deps and Chrome for Testing
+#   reel take   <scenario.mjs> [out]    record a take (default out: takes/take1)
+#   reel speech <take.mov>              where there is sound in a take, to place cuts in pauses
+#   reel layers <edit.json>             render the overlay layers (captions, cards, frame)
+#   reel stills <edit.json> <t,t,...>   preview frames at output times, in <build>/stills/
+#   reel render <edit.json> [out.mp4]   render the video
+#   reel sheet  <video.mp4> <t,t,...>   contact sheet, length and loudness of a render
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PY=(uv run --no-project --quiet --with pillow --with numpy python)
+cmd=${1:-help}; shift || true
+case "$cmd" in
+  setup)
+    "$ROOT/recorder/build.sh"
+    (cd "$ROOT" && npm install --silent && npx --yes playwright@1.49.1 install chromium)
+    command -v ffmpeg >/dev/null || echo "also install ffmpeg (brew install ffmpeg)"
+    command -v uv >/dev/null || echo "also install uv (brew install uv)" ;;
+  take)   node "$ROOT/drive/take.mjs" "$1" --out "${2:-takes/take1}" ;;
+  speech) "$ROOT/qa/speech.sh" "$@" ;;
+  layers) "${PY[@]}" "$ROOT/layers/render.py" "$1" ;;
+  stills) "${PY[@]}" "$ROOT/compose/compose.py" "$1" --stills "$2" ;;
+  render) "${PY[@]}" "$ROOT/layers/render.py" "$1" && "${PY[@]}" "$ROOT/compose/compose.py" "$1" ${2:+--out "$2"} ;;
+  sheet)  "$ROOT/qa/sheet.sh" "$@" ;;
+  *) sed -n '2,9p' "$0" ;;
+esac

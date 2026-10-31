@@ -1,0 +1,64 @@
+{
+  "size": [1080, 1350],
+  "fps": 30,
+  "take": "takes/take1",
+  "build": "build",
+  "transition": 0.4,
+  "dip": [205, 219, 234],
+
+  "brand": {
+    "name": "Sawt",
+    "accent": "#0d9488",
+    "accentLight": "#2dd4bf",
+    "background": ["#ffffff", "#f4fbfa", "#e6f4f1"],
+    "logo": "logo.svg",
+    "toolbarIcon": "logo.svg",
+    "pixelated": true
+  },
+
+  "window": { "x": 40, "y": 356, "w": 1000, "h": 934, "bar": 52, "r": 22,
+              "url": "astralcodexten.com/p/heuristics-that-almost-always-work" },
+
+  "shots": {
+    "wide":  { "fit": ["title", { "rect": "card1", "dh": 330 }, "para3"], "pad": 30 },
+    "card1": { "fit": [{ "rect": "card1", "dh": 330 }], "pad": 90, "minWidth": 1250, "dx": -190 },
+    "top":   { "fit": ["title", "para1"], "pad": 40 },
+    "para":  { "fit": ["para1", "para2"], "pad": 20, "minWidth": 1500, "dy": -100 },
+    "para2": { "fit": ["para1", "para2"], "pad": 20, "minWidth": 1460, "dy": -100 },
+    "heur":  { "fit": ["para3", { "rect": "card2", "dh": 480 }], "pad": 40 },
+    "card2": { "fit": [{ "rect": "card2", "dh": 480 }], "pad": 90, "minWidth": 1000 }
+  },
+
+  "scenes": [
+    { "card": "title", "dur": 2.4,
+      "title": { "alt": "صوت", "altFont": "\"Geeza Pro\", sans-serif", "badge": "Version 0.2",
+                 "tagline": "Now it explains<br><b>the words you don’t know.</b>" } },
+
+    { "take": [["sentence#0-1.8", "sentence#2-0.18"]],
+      "camera": [["sentence#0-1.8", "wide"], ["sentence#0+0.7", "wide"], ["sentence#0+1.9", "card1"],
+                 ["sentence#1-0.3", "card1"], ["sentence#1+0.9", "top"]],
+      "toasts": [{ "at": 0.6, "until": 2.3, "keys": ["Alt", "R"], "text": "starts reading" }],
+      "captions": [
+        { "at": 0.2, "until": 2.35, "kicker": "New in Sawt 0.2", "text": "Press Alt+R and any<br>article is <b>read aloud.</b>" },
+        { "at": 2.5, "until": -0.1, "kicker": "Meanings", "text": "Hard words get a card,<br><b>right as you hear them.</b>" }
+      ] },
+
+    { "take": [["sentence#5-0.15", "sentence#8-0.3"]],
+      "camera": [["sentence#5-0.15", "para"], ["sentence#8-0.3", "para2"]],
+      "captions": [{ "at": 0.15, "until": -0.15, "kicker": "Word zoom", "text": "Follow along. Each word<br><b>grows as it’s spoken.</b>" }] },
+
+    { "take": [["sentence#11-0.11", "sentence#12-0.2"]],
+      "camera": [["sentence#11-0.11", "heur"], ["sentence#11+0.8", "heur"], ["sentence#11+2.0", "card2"]],
+      "captions": [{ "at": 0.15, "until": -0.15, "kicker": "Offline dictionary", "text": "Meanings come from<br><b>your own computer.</b>" }] },
+
+    { "images": ["takes/take1-popup-light.png", "takes/take1-popup-dark.png"], "dur": 3.6, "width": 480,
+      "reveal": { "at": 1.35, "dur": 0.75, "from": [278, 424], "srcWidth": 352 },
+      "captions": [{ "at": 0.15, "until": 3.45, "kicker": "Appearance", "text": "Light or dark.<br><b>Your call.</b>" }] },
+
+    { "card": "end", "dur": 3.4,
+      "end": { "points": ["Explains hard words as you listen", "Free, private, no account", "Runs on your own computer"],
+               "pill": "github.com/muneebsajjad/sawt", "sub": "Open source · on the Chrome Web Store" } }
+  ],
+
+  "audio": { "loudness": -16 }
+}

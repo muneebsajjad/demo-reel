@@ -1,0 +1,13 @@
+node_modules/
+.demo-reel-profile/
+recorder/record
+takes/
+renders/
+examples/*/ext/
+examples/*/takes/
+examples/*/build/
+*.mov
+*.mp4
+*.wav
+.DS_Store
+__pycache__/

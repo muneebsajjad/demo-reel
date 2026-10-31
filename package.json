@@ -1,0 +1,11 @@
+{
+  "name": "demo-reel",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Product demo videos made by an agent: record a real app, frame it, caption it, render it.",
+  "type": "module",
+  "license": "MIT",
+  "dependencies": {
+    "playwright-core": "1.49.1"
+  }
+}
