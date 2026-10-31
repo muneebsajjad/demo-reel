@@ -28,12 +28,13 @@ LICENSES = {
     "Purchased":    dict(ok=True,  credit=False, bundle=False, name="Purchased licence",
                          note="keep the licence certificate; check its terms for the platform you post on"),
 }
-for nc in ["CC-BY-NC-3.0", "CC-BY-NC-4.0", "CC-BY-NC-SA-3.0", "CC-BY-NC-SA-4.0"]:
-    LICENSES[nc] = dict(ok=False, credit=True, bundle=True, name="CC " + "-".join(nc.split("-")[1:-1]) + " " + nc.split("-")[-1],
-                        why="non-commercial: a product demo is commercial use")
-for nd in ["CC-BY-ND-3.0", "CC-BY-ND-4.0", "CC-BY-NC-ND-3.0", "CC-BY-NC-ND-4.0"]:
-    LICENSES[nd] = dict(ok=False, credit=True, bundle=True, name="CC " + "-".join(nd.split("-")[1:-1]) + " " + nd.split("-")[-1],
-                        why="no derivatives: cutting and mixing the track under a video is an adaptation")
+def _cc_name(lid): return "CC " + "-".join(lid.split("-")[1:-1]) + " " + lid.split("-")[-1]
+for lid in ["CC-BY-NC-3.0", "CC-BY-NC-4.0", "CC-BY-NC-SA-3.0", "CC-BY-NC-SA-4.0",
+            "CC-BY-ND-3.0", "CC-BY-ND-4.0", "CC-BY-NC-ND-3.0", "CC-BY-NC-ND-4.0"]:
+    why = []
+    if "-NC" in lid: why.append("non-commercial: a product demo is commercial use")
+    if "-ND" in lid: why.append("no derivatives: cutting and mixing the track under a video is an adaptation")
+    LICENSES[lid] = dict(ok=False, credit=True, bundle=True, name=_cc_name(lid), why="; ".join(why))
 
 class LicenseError(Exception):
     pass

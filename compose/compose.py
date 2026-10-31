@@ -7,7 +7,7 @@ and the take's own sound cut to match.
 --stills writes PNGs of those output times to <build>/stills/ instead of rendering the video:
 use it to check framing before the full render. See docs/edit-format.md for the edit file.
 """
-import json, math, pathlib, subprocess, sys, wave
+import json, math, pathlib, re, subprocess, sys, wave
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
@@ -28,6 +28,13 @@ PICK_COUNT = int(args[args.index("--pick-music") + 1]) if PICK_ONLY and len(args
     and args[args.index("--pick-music") + 1].isdigit() else 3
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import music
+
+import validate as _validate
+_problems = _validate.validate(EDIT, BASE)
+if _problems:
+    print(f"{EDIT_PATH.name}: {len(_problems)} problem{'s' * (len(_problems) != 1)}")
+    for _p in _problems: print("  -", _p)
+    sys.exit(1)
 
 W, H = EDIT.get("size", [1080, 1350])
 FPS = EDIT.get("fps", 30)
@@ -52,80 +59,12 @@ m = Image.new("L", (VW, VH), 0)
 ImageDraw.Draw(m).rounded_rectangle([0, -40, VW - 1, VH - 1], radius=WIN["r"], fill=255)
 VMASK = (np.asarray(m).astype(np.float32) / 255)[..., None]
 
-def ease(x):
-    x = min(1, max(0, x))
-    return x * x * x * (x * (6 * x - 15) + 10)
+from timeline import ease, src_time
+import timeline
 
-# ---- shots: where the camera looks, in page viewport pixels -----------------------------------
-def rect_of(ref):
-    if isinstance(ref, str): ref = {"rect": ref}
-    if "rect" in ref:
-        r = RECTS[ref["rect"]]
-        x, y, w, h = r["x"], r["y"], r["width"], r["height"]
-    else:
-        x, y, w, h = ref["x"], ref["y"], ref["width"], ref["height"]
-    return (x + ref.get("dx", 0), y + ref.get("dy", 0), w + ref.get("dw", 0), h + ref.get("dh", 0))
-
-def clamp_shot(cx, cy, w):
-    w = min(w, PAGE[2], PAGE[3] * ASPECT)
-    h = w / ASPECT
-    return (min(PAGE[2] - w / 2, max(w / 2, cx)), min(PAGE[3] - h / 2, max(h / 2, cy)), w)
-
-def shot(spec):
-    if isinstance(spec, str): spec = EDIT["shots"][spec]
-    if "fit" in spec:
-        boxes = [rect_of(r) for r in spec["fit"]]
-        x0 = min(b[0] for b in boxes); y0 = min(b[1] for b in boxes)
-        x1 = max(b[0] + b[2] for b in boxes); y1 = max(b[1] + b[3] for b in boxes)
-        p = spec.get("pad", 60)
-        x0 -= p; y0 -= p; x1 += p; y1 += p
-        w = max(x1 - x0, (y1 - y0) * ASPECT, spec.get("minWidth", 0))
-        cy = (y0 + y1) / 2 + spec.get("dy", 0)
-        return clamp_shot((x0 + x1) / 2 + spec.get("dx", 0), cy, w)
-    return clamp_shot(spec["cx"], spec["cy"], spec["w"])
-
-def camera(keys, t):
-    keys = [(k[0], shot(k[1])) for k in keys]
-    if t <= keys[0][0]: return keys[0][1]
-    for (t0, a), (t1, b) in zip(keys, keys[1:]):
-        if t <= t1:
-            u = ease((t - t0) / (t1 - t0)) if t1 > t0 else 1
-            w = math.exp(math.log(a[2]) + (math.log(b[2]) - math.log(a[2])) * u)   # even-feeling zoom
-            return (a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, w)
-    return keys[-1][1]
-
-# ---- take times: seconds, or anchored to logged events ---------------------------------------
-import re
+GEO = timeline.Frame(PAGE[2], PAGE[3], ASPECT, RECTS, EDIT.get("shots", {}))
 EVENTS = LOG.get("events", [])
-def T(v):
-    """12.5 | "sentence#5-0.15" (6th 'sentence' event, minus 0.15s) | "read+1" | "zoom on"."""
-    if isinstance(v, (int, float)): return float(v)
-    m = re.fullmatch(r"\s*(.+?)(?:#(\d+))?\s*([+-]\s*\d+(?:\.\d+)?)?\s*", v)
-    if not m: raise ValueError(f"bad time {v!r}")
-    hits = [e for e in EVENTS if e["name"] == m.group(1)]
-    k = int(m.group(2) or 0)
-    if k >= len(hits): raise ValueError(f"{v!r}: only {len(hits)} '{m.group(1)}' events in the take")
-    return hits[k]["t"] + float((m.group(3) or "0").replace(" ", ""))
-
-for s in SCENES:
-    if "take" in s:
-        s["take"] = [[T(a), T(b)] for a, b in s["take"]]
-        s["camera"] = [[T(t), sh] for t, sh in s["camera"]]
-
-# ---- timeline --------------------------------------------------------------------------------
-t = 0
-for s in SCENES:
-    if "take" in s: s["dur"] = sum(b - a for a, b in s["take"])
-    s["start"], t = t, t + s["dur"]
-    for c in s.get("captions", []) + s.get("toasts", []):     # negative: seconds before the scene ends
-        if c["until"] < 0: c["until"] += s["dur"]
-TOTAL = t
-
-def src_time(s, local):
-    for a, b in s["take"]:
-        if local <= b - a: return a + local
-        local -= b - a
-    return s["take"][-1][1] + local
+TOTAL = timeline.build(SCENES, EVENTS)
 
 class Reader:
     """Frames of the take's page viewport from `start`, in order, at FPS."""
@@ -157,10 +96,7 @@ def take_view(si, local):
         a, b = s["take"][piece]
         readers[(si, piece)] = Reader(a - XF, (b - a) + 2 * XF + 0.3)
     img = readers[(si, piece)].at(st)
-    cx, cy, w = clamp_shot(*camera(s["camera"], st))
-    h = w / ASPECT
-    box = (max(0.0, cx - w / 2), max(0.0, cy - h / 2), min(PAGE[2], cx + w / 2), min(PAGE[3], cy + h / 2))
-    view = img.resize((VW, VH), Image.LANCZOS, box=box)
+    view = img.resize((VW, VH), Image.LANCZOS, box=GEO.box(*GEO.camera(s["camera"], st)))
     return np.asarray(view).astype(np.float32) / 255
 
 def window_with(view):

@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install ffmpeg
+        run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
+      - name: Check scripts parse
+        run: |
+          for f in drive/*.mjs examples/*/scenario.mjs; do node --check "$f"; done
+          bash -n bin/reel qa/*.sh recorder/build.sh examples/*/prepare.sh
+      - name: Check the example edit
+        run: |
+          # the example's take is not in the repo; validate everything that does not need it
+          uv run --quiet python -c "
+          import json, sys; sys.path.insert(0, 'compose')
+          import validate
+          e = json.load(open('examples/sawt/edit.json'))
+          log = {'viewport': {'width': 3400, 'height': 1894},
+                 'events': [{'t': 1 + i, 'name': 'sentence'} for i in range(14)],
+                 'rects': {k: {'x': 0, 'y': 0, 'width': 10, 'height': 10} for k in
+                           ['title', 'body', 'para1', 'para2', 'para3', 'card1', 'card2']}}
+          problems = [p for p in validate.validate(e, 'examples/sawt', log=log) if 'not found' not in p]
+          print('\n'.join(problems) or 'ok'); sys.exit(bool(problems))"
+      - name: Tests (unit and end-to-end render)
+        run: uv run --quiet --group dev pytest -q
+
+  recorder:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the recorder
+        run: recorder/build.sh

@@ -1,8 +1,10 @@
 #!/bin/bash
 # reel: one entry point for every step.
 #   reel setup                          build the recorder, install Node deps and Chrome for Testing
+#   reel doctor                         check this machine has everything, and say what to fix
 #   reel take   <scenario.mjs> [out]    record a take (default out: takes/take1)
 #   reel speech <take.mov>              where there is sound in a take, to place cuts in pauses
+#   reel check  <edit.json>             find problems in an edit before rendering
 #   reel layers <edit.json>             render the overlay layers (captions, cards, frame)
 #   reel stills <edit.json> <t,t,...>   preview frames at output times, in <build>/stills/
 #   reel render <edit.json> [out.mp4]   render the video
@@ -18,12 +20,15 @@ case "$cmd" in
     (cd "$ROOT" && npm install --silent && npx --yes playwright@1.49.1 install chromium)
     command -v ffmpeg >/dev/null || echo "also install ffmpeg (brew install ffmpeg)"
     command -v uv >/dev/null || echo "also install uv (brew install uv)" ;;
+  doctor) python3 "$ROOT/tools/doctor.py" ;;
   take)   node "$ROOT/drive/take.mjs" "$1" --out "${2:-takes/take1}" ;;
   speech) "$ROOT/qa/speech.sh" "$@" ;;
-  layers) "${PY[@]}" "$ROOT/layers/render.py" "$1" ;;
+  check)  "${PY[@]}" "$ROOT/compose/validate.py" "$1" ;;
+  layers) "${PY[@]}" "$ROOT/compose/validate.py" "$1" >/dev/null || { "${PY[@]}" "$ROOT/compose/validate.py" "$1"; exit 1; }
+          "${PY[@]}" "$ROOT/layers/render.py" "$1" ;;
   stills) "${PY[@]}" "$ROOT/compose/compose.py" "$1" --stills "$2" ;;
   render) "${PY[@]}" "$ROOT/layers/render.py" "$1" && "${PY[@]}" "$ROOT/compose/compose.py" "$1" ${2:+--out "$2"} ;;
   sheet)  "$ROOT/qa/sheet.sh" "$@" ;;
   music)  "${PY[@]}" "$ROOT/compose/music_cli.py" "$@" ;;
-  *) sed -n '2,10p' "$0" ;;
+  *) sed -n '2,12p' "$0" ;;
 esac

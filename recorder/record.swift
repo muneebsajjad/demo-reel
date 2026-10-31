@@ -1,6 +1,7 @@
 // record: capture one app's windows and that app's sound, nothing else on the screen or speakers.
 //
 //   record --app <bundle id prefix> --out take.mov [--seconds 120] [--no-audio] [--cursor]
+//   record --check-permission
 //
 // Stops when <out>.stop appears (touch it from your driver), or after --seconds.
 // Prints one JSON line per event on stdout, line-buffered:
@@ -25,6 +26,13 @@ func emit(_ obj: [String: Any]) {
     print(String(data: data, encoding: .utf8)!)
 }
 func fail(_ msg: String) -> Never { emit(["event": "error", "message": msg]); exit(1) }
+
+// record --check-permission: exit 0 if this terminal may record the screen, 2 if not
+if CommandLine.arguments.contains("--check-permission") {
+    let ok = CGPreflightScreenCaptureAccess()
+    emit(["event": "permission", "screen": ok])
+    exit(ok ? 0 : 2)
+}
 
 var app = "com.google.chrome.for.testing", outPath = "take.mov", seconds = 120.0
 var audio = true, cursor = false

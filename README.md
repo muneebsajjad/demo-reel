@@ -4,6 +4,8 @@ Product demo videos made by an agent. It records the real product in a browser, 
 a clean window, moves a camera to what matters, adds captions, title and end cards, and renders an
 MP4 ready to post: no video editor, no timeline.
 
+[![CI](https://github.com/muneebsajjad/demo-reel/actions/workflows/ci.yml/badge.svg)](https://github.com/muneebsajjad/demo-reel/actions/workflows/ci.yml)
+
 ![Frames from the Sawt 0.2 demo](docs/assets/sawt-sheet.png)
 
 *Frames from [`examples/sawt`](examples/sawt): a 31-second LinkedIn video for
@@ -73,6 +75,16 @@ reel sheet renders/sawt.mp4 1,4,9,14,20,26,30
 
 `docs/edit-format.md` documents the edit file; `docs/lessons.md` is what went wrong the first time
 and how the tools now avoid it.
+
+## Development
+
+```bash
+reel doctor                              # is this machine ready?
+uv run --group dev pytest -q             # unit tests and an end-to-end render (needs ffmpeg and Chrome)
+reel check examples/sawt/edit.json       # an edit's problems, before rendering
+```
+
+CI runs the tests on Linux and builds the recorder on macOS for every push.
 
 ## Status
 

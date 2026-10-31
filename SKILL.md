@@ -17,7 +17,7 @@ The pipeline, and the file each step makes:
 | 2. Scenario | write `scenario.mjs` | the steps a user would take |
 | 3. Take | `bin/reel take scenario.mjs takes/take1` | `take1.mov` (picture + the app's sound), `take1.json` (events, element positions) |
 | 4. Edit | write `edit.json` | scenes, shots, captions, brand |
-| 5. Stills | `bin/reel layers edit.json` then `bin/reel stills edit.json 1,4,9` | preview frames |
+| 5. Stills | `bin/reel check edit.json`, `bin/reel layers edit.json`, then `bin/reel stills edit.json 1,4,9` | problems found early; preview frames |
 | 6. Render | `bin/reel render edit.json renders/x.mp4` | the video |
 | 7. Check | `bin/reel sheet renders/x.mp4 1,4,9,…` | contact sheet, length, loudness |
 
@@ -27,6 +27,7 @@ reference; `docs/lessons.md` lists what went wrong the first time, so read it be
 
 ## 0. Setup (once)
 
+Run `bin/reel doctor` first: it checks every tool and permission and says what to fix.
 `bin/reel setup` builds the recorder (Swift, ScreenCaptureKit), installs `playwright-core` and Chrome
 for Testing. Also needed: `ffmpeg`, `uv`, Google Chrome (to render the overlay layers). The terminal
 running you needs **Screen & System Audio Recording** permission (System Settings → Privacy &
