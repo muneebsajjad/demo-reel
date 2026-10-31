@@ -102,5 +102,14 @@ second image from a point, as a theme switch would:
 
 ## audio
 
-The take's own sound, cut with the picture, normalised in two passes to `loudness` LUFS. Add
-`music` for a bed under it (`gainDb` relative to full scale, faded out over `fade` seconds).
+The take's own sound, cut with the picture, brought to `loudness` LUFS with one fixed gain and a
+peak limiter. `music` adds a bed under it, fitted to the video's length and ducked under speech;
+it must carry a licence (see `docs/music.md`):
+
+```json
+"audio": { "loudness": -16,
+           "music": { "file": "music/bed.mp3", "gainDb": -20, "duckDb": -12, "start": 0, "fade": 1.5 } }
+```
+
+Licence fields (`license`, `title`, `artist`, `source`, `credit`) can sit in the music block or in
+the track's `.license.json` sidecar.

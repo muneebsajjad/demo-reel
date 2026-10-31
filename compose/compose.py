@@ -19,6 +19,11 @@ BUILD = BASE / EDIT.get("build", "build")
 LAYERS = BUILD / "layers"
 OUT = pathlib.Path(args[args.index("--out") + 1]).resolve() if "--out" in args else BASE / "renders" / "demo.mp4"
 STILLS = [float(x) for x in args[args.index("--stills") + 1].split(",")] if "--stills" in args else None
+# --audio-only <video>: rebuild only the sound (e.g. another music track) onto an existing render
+AUDIO_ONLY = pathlib.Path(args[args.index("--audio-only") + 1]).resolve() if "--audio-only" in args else None
+CREDITS = OUT.with_suffix(".credits.txt")
+sys.path.insert(0, str(pathlib.Path(__file__).parent))
+import music
 
 W, H = EDIT.get("size", [1080, 1350])
 FPS = EDIT.get("fps", 30)
@@ -306,15 +311,24 @@ def soundtrack():
             if n: seg[:n] *= np.linspace(0, 1, n)[:, None]; seg[-n:] *= np.linspace(1, 0, n)[:, None]
             out[int(o * sr):int(o * sr) + len(seg)] += seg[:len(out) - int(o * sr)]
             o += b - a
-    music = EDIT.get("audio", {}).get("music")
-    if music:
-        raw = subprocess.run(["ffmpeg", "-loglevel", "error", "-i", str(BASE / music["file"]), "-ac", "2", "-ar", str(sr),
+    voice = out.copy()
+    spec = EDIT.get("audio", {}).get("music")
+    if spec:
+        rec = music.load(spec, BASE)
+        info = music.check(rec, allow=set(spec.get("allow", [])))
+        raw = subprocess.run(["ffmpeg", "-loglevel", "error", "-i", str(rec["path"]), "-ac", "2", "-ar", str(sr),
                               "-f", "f32le", "-"], capture_output=True).stdout
-        mus = np.frombuffer(raw, np.float32).reshape(-1, 2)[:len(out)].copy()
-        mus *= 10 ** (music.get("gainDb", -22) / 20)
-        f = int(music.get("fade", 1.5) * sr)
-        mus[-f:] *= np.linspace(1, 0, f)[:, None]
-        out[:len(mus)] += mus
+        if not raw: raise SystemExit(f"could not read music {rec['path']}")
+        mus = music.fit(np.frombuffer(raw, np.float32).reshape(-1, 2), len(out), sr,
+                        start=spec.get("start", 0.0), fade_out=spec.get("fade", 1.5))
+        mus *= 10 ** (spec.get("gainDb", -20) / 20)
+        if np.abs(voice).max() > 1e-3:                      # only duck when there is something to duck for
+            mus *= music.speech_gain(voice, sr, duck_db=spec.get("duckDb", -12))
+        out += mus
+        CREDITS.write_text(music.credits_text(rec, info))
+        print(f"music: {rec.get('title', rec['path'].name)} ({info['name']}); credits in {CREDITS}")
+        if info["credit"]: print("  this licence needs the credit published with the video: see the credits file")
+        if info.get("note"): print("  note:", info["note"])
     path = BUILD / "soundtrack.wav"
     with wave.open(str(path), "w") as wv:
         wv.setnchannels(2); wv.setsampwidth(2); wv.setframerate(sr)
@@ -322,13 +336,12 @@ def soundtrack():
     return path
 
 def loudnorm_args(path, target):
-    """Two-pass loudness: measure, then apply linearly, so speech is not pumped."""
-    r = subprocess.run(["ffmpeg", "-hide_banner", "-i", str(path), "-af",
-                        f"loudnorm=I={target}:TP=-1.5:LRA=11:print_format=json", "-f", "null", "-"],
-                       capture_output=True, text=True).stderr
-    m = json.loads(r[r.rindex("{"):r.rindex("}") + 1])
-    return (f"loudnorm=I={target}:TP=-1.5:LRA=11:measured_I={m['input_i']}:measured_TP={m['input_tp']}:"
-            f"measured_LRA={m['input_lra']}:measured_thresh={m['input_thresh']}:offset={m['target_offset']}:linear=true")
+    """One fixed gain to reach `target` LUFS, then a peak limiter at -1 dBFS. (ffmpeg's loudnorm
+    quietly turns dynamic when it cannot stay linear, which pumps music up in the pauses.)"""
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-i", str(path), "-af", "highpass=f=70,ebur128",
+                        "-f", "null", "-"], capture_output=True, text=True).stderr
+    i = float(re.findall(r"I:\s+(-?[\d.]+) LUFS", r)[-1])
+    return f"volume={target - i:.2f}dB,alimiter=limit=0.891:attack=5:release=60:level=false"
 
 if STILLS:
     (BUILD / "stills").mkdir(parents=True, exist_ok=True)
@@ -342,10 +355,20 @@ if STILLS:
     sys.exit()
 
 OUT.parent.mkdir(parents=True, exist_ok=True)
-audio = soundtrack()
+CREDITS.unlink(missing_ok=True)
+try:
+    audio = soundtrack()
+except music.LicenseError as e:
+    raise SystemExit(f"music refused: {e}")
 target = EDIT.get("audio", {}).get("loudness", -16)
 silent = np.abs(np.frombuffer(open(audio, "rb").read()[44:], np.int16)).max() < 30
 af = "aresample=48000" if silent else f"highpass=f=70,{loudnorm_args(audio, target)},aresample=48000"
+if AUDIO_ONLY:
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(AUDIO_ONLY), "-i", str(audio), "-map", "0:v",
+                    "-map", "1:a", "-c:v", "copy", "-af", af, "-c:a", "aac", "-b:a", "192k", "-shortest",
+                    "-movflags", "+faststart", str(OUT)], check=True)
+    print("wrote", OUT)
+    sys.exit()
 enc = subprocess.Popen(["ffmpeg", "-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24",
                         "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-", "-i", str(audio), "-af", af,
                         "-c:v", "libx264", "-preset", "slow", "-crf", "16", "-profile:v", "high", "-pix_fmt", "yuv420p",

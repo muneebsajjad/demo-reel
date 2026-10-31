@@ -97,10 +97,19 @@ Write `edit.json` (reference: `docs/edit-format.md`). Rules that make it look ma
 Then put the MP4 in front of the person, with the thumbnail (`build/layers/title.png`), and say
 plainly what is real and what was changed for recording.
 
+## Music
+
+When the product makes no sound, the video needs a bed; under a voice it is optional. Read
+`docs/music.md`. In short: record every track's licence with `reel music add` (a render refuses
+music without one, and refuses non-commercial and no-derivatives licences); render once, then
+`reel music audition edit.json renders/x.mp4 <tracks…>` mixes each candidate onto the picture in
+seconds. You cannot hear: hand the previews to the person and let them choose. Give them the
+`.credits.txt` that sits beside the render, and tell them when its licence asks for a published credit.
+
 ## Limits
 
 - Recording is macOS only (ScreenCaptureKit). Compositing and layers run anywhere.
 - Browser products only so far; a desktop app needs its own driver (accessibility scripting), but
   the recorder (`--app <bundle id>`) and everything after it already work for any app.
-- Products without sound: the video is silent unless you add `audio.music` — you cannot hear the
-  result, so let the person choose the track.
+- Generating music (`reel music generate`) needs a local model wired in; ACE-Step is suggested but
+  not yet tested with demo-reel.

@@ -45,6 +45,11 @@ before recording a new product.
 - **Downscaling text needs a real resampler.** The compositor crops and resizes with Lanczos from the
   2x recording, so text stays crisp at any zoom without shimmer.
 - **Clamp crop boxes to the page**; a box edge of −1e−13 fails the resize.
-- **Loudness: measure, then apply linearly** (two-pass `loudnorm`). One pass over a track with long
-  silences under-shoots badly (−19.8 LUFS for a −16 target).
+- **Loudness: one fixed gain, then a limiter.** A single `loudnorm` pass over a track with long
+  silences under-shot badly (−19.8 LUFS for −16). Two-pass `loudnorm` with `linear=true` silently
+  falls back to dynamic mode when it cannot stay linear, and then swelled a music bed by 7 dB in the
+  pauses. The compositor now measures the integrated loudness, applies one gain and limits peaks.
+- **Measure what you cannot hear.** To check ducking, the test bed was a 7 kHz tone, where speech
+  has little energy, and its level was read per half second. (Resampling that check to 8 kHz first
+  removes the tone and makes it look missing.)
 - **Most viewers are muted.** Captions carry the story; the voice is a bonus.

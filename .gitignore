@@ -11,3 +11,4 @@ examples/*/build/
 *.wav
 .DS_Store
 __pycache__/
+examples/*/music/
