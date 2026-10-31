@@ -103,8 +103,10 @@ second image from a point, as a theme switch would:
 ## audio
 
 The take's own sound, cut with the picture, brought to `loudness` LUFS with one fixed gain and a
-peak limiter. `music` adds a bed under it, fitted to the video's length and ducked under speech;
-it must carry a licence (see `docs/music.md`):
+peak limiter. `music` adds a bed under it, fitted to the video's length and ducked under speech.
+Leave it out and the system picks one for the video; `"auto"` or `{"auto": true, "mood": "calm"}`
+says so explicitly; `null` means no music; a block with `file` uses your own track, which must
+carry a licence (see `docs/music.md`):
 
 ```json
 "audio": { "loudness": -16,

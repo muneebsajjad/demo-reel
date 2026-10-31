@@ -4,6 +4,45 @@ A bed under the video: essential when the product makes no sound, optional under
 track carries a licence record, and a render refuses music whose licence is missing, unknown or
 unfit for a product demo.
 
+## Automatic choice (the default)
+
+With no `music` in the edit, the system picks a bed for the video:
+
+1. **It reads the video**: length, how much of it has speech, how fast it cuts, and the words in the
+   captions. From these it sets a mood (calm, focused, warm, upbeat, energetic, cinematic), a target
+   energy and a tempo range. Set `"music": { "auto": true, "mood": "upbeat" }` to choose the mood
+   yourself.
+2. **It gathers licensed candidates**: tracks in your `music/` folder that have a licence record
+   first, then instrumental CC BY / CC0 tracks from ccMixter (and Openverse, when its audio search
+   is up). Non-commercial and no-derivatives licences are never considered.
+3. **It measures each track it may download**: tempo, energy, brightness, how much the volume
+   swells, how busy it is, the length of the intro. It scores them against the video: tempo and
+   energy close to the target, steady volume, not busy under speech, long enough not to loop.
+4. **It picks the best usable track**, records its licence and credit, and saves the choice in
+   `build/music-choice.json` so every later render sounds the same.
+
+```bash
+reel music auto edit.json --count 3 --audition renders/demo.mp4   # see the ranking, hear the top 3
+```
+
+Some sites do not allow scripts to download their files (ccMixter answers 403). Their tracks are
+still ranked, from their catalogue data (tempo tags, mood tags, popularity), and listed with a link.
+Download the one you like in a browser, then record it with the details already filled in:
+
+```bash
+reel music add music/that-track.mp3 --candidate 2      # 2 = its number in the list
+```
+
+A render never fails over music: if nothing usable is found, it renders without music and says why.
+
+**Your own sound always wins.** Put your track in the edit and the system stays out of it:
+
+```json
+"audio": { "music": { "file": "music/mine.mp3", "gainDb": -18 } }
+```
+
+and `"music": null` means no music at all.
+
 ## Record where a track came from
 
 ```bash

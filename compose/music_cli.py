@@ -4,6 +4,7 @@
     reel music list [folder]
     reel music audition <edit.json> <render.mp4> <track> [<track> ...]
     reel music generate --prompt TEXT --seconds 35 --out music/bed.wav [--seed 7]
+    reel music auto <edit.json> [--count 3] [--audition renders/demo.mp4]
 """
 import argparse, datetime, json, os, pathlib, shlex, subprocess, sys
 
@@ -16,6 +17,14 @@ AUDIO = {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".opus"}
 def cmd_add(a):
     track = pathlib.Path(a.track).resolve()
     if not track.exists(): sys.exit(f"no such file: {track}")
+    if a.candidate:                       # fill the record from the system's shortlist
+        edit_path = pathlib.Path(a.edit).resolve()
+        edit = json.loads(edit_path.read_text())
+        choice = json.loads((edit_path.parent / edit.get("build", "build") / "music-choice.json").read_text())
+        c = choice["shortlist"][a.candidate - 1]
+        a.title, a.artist, a.source = a.title or c["title"], a.artist or c.get("artist"), a.source or c.get("source")
+        a.license = a.license or c["license"]
+    if not a.license: sys.exit("--license is required (or --candidate N after `reel music auto`)")
     if a.license not in music.LICENSES: sys.exit(f"unknown licence {a.license!r}. Known: {', '.join(sorted(music.LICENSES))}")
     rec = {k: v for k, v in dict(title=a.title, artist=a.artist, source=a.source, license=a.license,
                                  credit=a.credit, added=datetime.date.today().isoformat()).items() if v}
@@ -89,13 +98,37 @@ def cmd_generate(a):
     music.sidecar(out).write_text(json.dumps(rec, indent=2) + "\n")
     print("wrote", out, "and", music.sidecar(out).name)
 
+def cmd_auto(a):
+    """Let the system choose: profile the video, rank licensed candidates, keep the best."""
+    edit_path = pathlib.Path(a.edit).resolve()
+    edit = json.loads(edit_path.read_text())
+    spec = edit.get("audio", {}).get("music")
+    if isinstance(spec, dict) and spec.get("file") and not spec.get("auto"):
+        print(f"this edit already uses your own track ({spec['file']}); showing what the system would pick instead.")
+    r = subprocess.run([sys.executable, str(ROOT / "compose/compose.py"), str(edit_path), "--pick-music", str(a.count)])
+    if r.returncode: sys.exit(r.returncode)
+    choice = json.loads((edit_path.parent / edit.get("build", "build") / "music-choice.json").read_text())
+    if spec is None or (isinstance(spec, dict) and spec.get("auto")) or spec == "auto":
+        print("renders of this edit will use this choice (delete build/music-choice.json to choose again)")
+    else:
+        print('this edit names its own music; set "music": "auto" (or remove it) to use the choice')
+    print(f"\nchosen: {choice['title']}")
+    if a.audition:
+        a.edit, a.video, a.tracks = str(edit_path), a.audition, [c["file"] for c in choice["shortlist"]]
+        cmd_audition(a)
+    print("To use your own track instead: reel music add <file> --license … then set music.file in the edit.")
+
 p = argparse.ArgumentParser(prog="reel music")
 sub = p.add_subparsers(dest="cmd", required=True)
-x = sub.add_parser("add"); x.add_argument("track"); x.add_argument("--license", required=True)
+x = sub.add_parser("add"); x.add_argument("track"); x.add_argument("--license")
+x.add_argument("--candidate", type=int, help="take title, artist, source and licence from `reel music auto`'s list")
+x.add_argument("--edit", default="edit.json")
 for f in ["title", "artist", "source", "credit"]: x.add_argument(f"--{f}")
 x = sub.add_parser("list"); x.add_argument("folder", nargs="?", default="music")
 x = sub.add_parser("audition"); x.add_argument("edit"); x.add_argument("video"); x.add_argument("tracks", nargs="+")
 x = sub.add_parser("generate"); x.add_argument("--prompt", required=True); x.add_argument("--seconds", type=float, default=35)
 x.add_argument("--out", required=True); x.add_argument("--seed", type=int, default=0)
+x = sub.add_parser("auto"); x.add_argument("edit"); x.add_argument("--count", type=int, default=3)
+x.add_argument("--audition", metavar="RENDER")
 a = p.parse_args()
-{"add": cmd_add, "list": cmd_list, "audition": cmd_audition, "generate": cmd_generate}[a.cmd](a)
+{"add": cmd_add, "list": cmd_list, "audition": cmd_audition, "generate": cmd_generate, "auto": cmd_auto}[a.cmd](a)

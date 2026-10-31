@@ -22,6 +22,10 @@ STILLS = [float(x) for x in args[args.index("--stills") + 1].split(",")] if "--s
 # --audio-only <video>: rebuild only the sound (e.g. another music track) onto an existing render
 AUDIO_ONLY = pathlib.Path(args[args.index("--audio-only") + 1]).resolve() if "--audio-only" in args else None
 CREDITS = OUT.with_suffix(".credits.txt")
+# --pick-music [N]: only choose music for this video (write <build>/music-choice.json), no render
+PICK_ONLY = "--pick-music" in args
+PICK_COUNT = int(args[args.index("--pick-music") + 1]) if PICK_ONLY and len(args) > args.index("--pick-music") + 1 \
+    and args[args.index("--pick-music") + 1].isdigit() else 3
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import music
 
@@ -295,6 +299,45 @@ def frame(t):
     return out
 
 # ---- sound -----------------------------------------------------------------------------------
+def auto_music(spec, voice, sr):
+    """Choose a bed for this video (or reuse the choice already made) and return a music block."""
+    import autopick
+    choice_file = BUILD / "music-choice.json"
+    p = autopick.profile(EDIT, SCENES, voice, sr, TOTAL)
+    if spec.get("mood"): p = autopick.profile({"audio": {"music": spec}}, SCENES, voice, sr, TOTAL)
+    if choice_file.exists() and not PICK_ONLY:
+        choice = json.loads(choice_file.read_text())
+        if pathlib.Path(choice["file"]).exists():
+            print(f"music (auto, chosen before): {choice['title']}  — delete {choice_file.name} to choose again")
+            return {**spec, "file": choice["file"], "gainDb": spec.get("gainDb", choice["gainDb"])}
+    print(f"video: {p['length']:.0f}s, voice {p['voice']:.0%} of it, {p['pace']} changes/min -> "
+          f"mood {p['mood']}, energy {p['energy']}, {p['bpm'][0]}-{p['bpm'][1]} bpm")
+    folders = [BASE / f for f in spec.get("folders", ["music"])]
+    ranked = autopick.pick(p, folders, online=spec.get("online", True), count=PICK_COUNT)
+    if not ranked:
+        if PICK_ONLY: raise SystemExit("no usable music found: add your own with `reel music add`, or set music to null")
+        print("music: nothing suitable found; rendering without music"); return None
+    usable = [e for e in ranked if e[3] is not None]
+    show = ranked[:PICK_COUNT] + [e for e in usable[:1] if e not in ranked[:PICK_COUNT]]
+    for e in show: print(f"  {ranked.index(e) + 1}. " + autopick.describe(e, p))
+    ranked = show
+    gain = spec.get("gainDb", -20 if p["voice"] > 0.1 else -12)       # alone, the bed carries the video
+    shortlist = [dict(file=str(e[3]) if e[3] else None, title=e[4]["title"], artist=e[4].get("artist"),
+                      source=e[4].get("source"), license=e[4].get("license"), score=e[0], features=e[2])
+                 for e in ranked]
+    BUILD.mkdir(parents=True, exist_ok=True)
+    if not usable:
+        choice_file.write_text(json.dumps(dict(file=None, profile=p, shortlist=shortlist), indent=2, default=str))
+        msg = ("none of the best matches can be downloaded by script. Download one from its link, then "
+               "`reel music add <file> --candidate N` (N from the list above) and render again.")
+        if PICK_ONLY: raise SystemExit(msg)
+        print("music: " + msg + " Rendering without music for now.")
+        return None
+    best = usable[0]
+    choice = dict(file=str(best[3]), title=best[4]["title"], gainDb=gain, profile=p, shortlist=shortlist)
+    choice_file.write_text(json.dumps(choice, indent=2, default=str))
+    return {**spec, "file": choice["file"], "gainDb": gain}
+
 def soundtrack():
     sr = 48000
     raw = subprocess.run(["ffmpeg", "-loglevel", "error", "-i", str(TAKE), "-vn", "-ac", "2", "-ar", str(sr),
@@ -312,7 +355,11 @@ def soundtrack():
             out[int(o * sr):int(o * sr) + len(seg)] += seg[:len(out) - int(o * sr)]
             o += b - a
     voice = out.copy()
-    spec = EDIT.get("audio", {}).get("music")
+    # no music block: the system picks; "music": null: none; a file: yours
+    spec = EDIT.get("audio", {}).get("music", "auto")
+    if PICK_ONLY or spec == "auto" or (isinstance(spec, dict) and spec.get("auto")):
+        spec = auto_music(spec if isinstance(spec, dict) and spec.get("auto") else {}, voice, sr)
+    if PICK_ONLY: sys.exit()
     if spec:
         rec = music.load(spec, BASE)
         info = music.check(rec, allow=set(spec.get("allow", [])))

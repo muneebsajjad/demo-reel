@@ -99,12 +99,14 @@ plainly what is real and what was changed for recording.
 
 ## Music
 
-When the product makes no sound, the video needs a bed; under a voice it is optional. Read
-`docs/music.md`. In short: record every track's licence with `reel music add` (a render refuses
-music without one, and refuses non-commercial and no-derivatives licences); render once, then
-`reel music audition edit.json renders/x.mp4 <tracks…>` mixes each candidate onto the picture in
-seconds. You cannot hear: hand the previews to the person and let them choose. Give them the
-`.credits.txt` that sits beside the render, and tell them when its licence asks for a published credit.
+By default the system picks a bed that suits the video (`docs/music.md`): it profiles the video
+(length, speech, pace, caption words), ranks licensed instrumental candidates by measured tempo,
+energy and steadiness, and keeps the best. Run `reel music auto edit.json --audition renders/x.mp4`
+to see the ranking and get a preview of the top tracks. You cannot hear, so hand the previews to the
+person before calling the video done. When the best tracks are link-only (the site blocks scripted
+downloads), give the person the links; they download one and run `reel music add <file> --candidate N`.
+If they bring their own track, record its licence with `reel music add` and put it in the edit.
+Always give them the `.credits.txt` beside the render, and say when its licence needs a published credit.
 
 ## Limits
 

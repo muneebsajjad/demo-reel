@@ -60,5 +60,5 @@
                "pill": "github.com/muneebsajjad/sawt", "sub": "Open source · on the Chrome Web Store" } }
   ],
 
-  "audio": { "loudness": -16 }
+  "audio": { "loudness": -16, "music": null }
 }

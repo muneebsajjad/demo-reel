@@ -14,6 +14,7 @@ import json, pathlib
 LICENSES = {
     "CC0-1.0":      dict(ok=True,  credit=False, bundle=True,  name="CC0 1.0 (public domain)"),
     "PD":           dict(ok=True,  credit=False, bundle=True,  name="Public domain"),
+    "CC-BY-2.5":    dict(ok=True,  credit=True,  bundle=True,  name="CC BY 2.5"),
     "CC-BY-3.0":    dict(ok=True,  credit=True,  bundle=True,  name="CC BY 3.0"),
     "CC-BY-4.0":    dict(ok=True,  credit=True,  bundle=True,  name="CC BY 4.0"),
     "CC-BY-SA-3.0": dict(ok=True,  credit=True,  bundle=True,  name="CC BY-SA 3.0",

@@ -53,3 +53,11 @@ before recording a new product.
   has little energy, and its level was read per half second. (Resampling that check to 8 kHz first
   removes the tone and makes it look missing.)
 - **Most viewers are muted.** Captions carry the story; the voice is a bonus.
+
+## Music
+
+- **Pick by measurement, then by ear.** The system scores tracks on tempo, energy, steadiness and
+  busy-ness against the video's profile, but an agent cannot hear: the person gets previews of the
+  top few before a video is called done.
+- **Respect sites that refuse scripts.** ccMixter answers 403 to scripted downloads. Its tracks are
+  ranked from catalogue data and handed over as links; nothing pretends to be a browser.
