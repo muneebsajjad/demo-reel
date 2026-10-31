@@ -30,7 +30,7 @@ def test_a_good_edit_has_no_problems():
     assert check(EDIT) == []
 
 @pytest.mark.parametrize("change, expect", [
-    (lambda e: e.pop("window"), "window: missing"),
+    (lambda e: e.pop("take"), "take: missing"),
     (lambda e: e["window"].update(w=2000), "does not fit"),
     (lambda e: e["brand"].update(background=["#fff"]), "brand.background"),
     (lambda e: e["shots"]["t"]["fit"].append("nope"), "shots.t: no rect 'nope'"),
@@ -47,6 +47,9 @@ def test_a_good_edit_has_no_problems():
     (lambda e: e["scenes"][1]["toasts"][0].update(at=20, until=30), "starts after the scene ends"),
     (lambda e: e["scenes"].append({"images": ["missing.png"], "dur": 2}), "missing.png not found"),
     (lambda e: e["audio"].update(music="loud"), 'audio.music: "auto", null'),
+    (lambda e: e.update(subtitles={"burn": True, "colour": "red"}), "subtitles: unknown option colour"),
+    (lambda e: e.update(formats=["4:5", "21:9"]), "formats: '21:9'"),
+    (lambda e: e.update(format="3:2"), "format: '3:2'"),
     (lambda e: e["audio"].update(music={"file": "nope.mp3"}), "audio.music.file: nope.mp3 not found"),
 ])
 def test_problems_are_found_and_located(change, expect):

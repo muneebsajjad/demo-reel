@@ -18,8 +18,9 @@ The pipeline, and the file each step makes:
 | 3. Take | `bin/reel take scenario.mjs takes/take1` | `take1.mov` (picture + the app's sound), `take1.json` (events, element positions) |
 | 4. Edit | write `edit.json` | scenes, shots, captions, brand |
 | 5. Stills | `bin/reel check edit.json`, `bin/reel layers edit.json`, then `bin/reel stills edit.json 1,4,9` | problems found early; preview frames |
-| 6. Render | `bin/reel render edit.json renders/x.mp4` | the video |
-| 7. Check | `bin/reel sheet renders/x.mp4 1,4,9,…` | contact sheet, length, loudness |
+| 6. Subtitles | `bin/reel subtitles edit.json`, then read and fix `build/subtitles.srt` | what is said, as captions |
+| 7. Render | `bin/reel render edit.json renders/x.mp4 --format all` | the video in each format, with its `.srt` |
+| 8. Check | `bin/reel sheet renders/x.mp4 1,4,9,…` | contact sheet, length, loudness |
 
 `examples/sawt/` is a complete worked example (a Chrome extension that reads articles aloud). Open
 its `scenario.mjs` and `edit.json` before writing your own. `docs/edit-format.md` is the edit file
@@ -45,7 +46,13 @@ Agree, in a few lines, before recording anything:
 - the brand: accent colour, a light variant, background tints, logo; title and end card text.
 
 Default format: 1080×1350 (4:5), 25–35 s — it fills the most of a phone feed, and most people watch
-muted, so the captions must carry the story on their own.
+muted, so the captions must carry the story on their own. Ask where it will be posted: 1:1, 9:16 and
+16:9 come from the same edit (`--format`), so offer them. Check stills of each format you render:
+a shot that frames well in 4:5 can cut a heading in 1:1; nudge it per format (`"1:1": {"dy": 20}`).
+
+When the product speaks (or the take has narration), make subtitles: `reel subtitles`, then read
+the `.srt` and fix names and jargon before rendering — the transcription is good, not perfect.
+Put hard words in `subtitles.words` to steer it.
 
 ## 2. Scenario
 

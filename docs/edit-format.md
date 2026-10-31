@@ -5,7 +5,8 @@
 
 ```jsonc
 {
-  "size": [1080, 1350],            // output pixels; 4:5 by default
+  "format": "4:5",                 // 4:5, 1:1, 9:16 or 16:9 (see "formats" below)
+  "formats": ["4:5", "1:1", "16:9"],   // what `reel render --format all` makes
   "fps": 30,
   "take": "takes/take1",           // reads take1.mov and take1.json
   "build": "build",                // layers and stills go here
@@ -17,6 +18,29 @@
   "scenes": [ ... ],
   "audio": { "loudness": -16, "music": { "file": "music.m4a", "gainDb": -22, "fade": 1.5 } }
 }
+```
+
+## formats
+
+One edit renders to any of four layouts; the camera's fitted shots adapt to each window's shape.
+
+| Format | Size | Layout | For |
+|---|---|---|---|
+| `4:5` | 1080×1350 | caption above the window | LinkedIn, Instagram feeds |
+| `1:1` | 1080×1080 | caption above, smaller | square feeds |
+| `9:16` | 1080×1920 | caption above, tall window | stories, reels, shorts |
+| `16:9` | 1920×1080 | caption on the left, window on the right | YouTube, websites, X |
+
+```bash
+reel render edit.json renders/demo.mp4 --format 16:9
+reel render edit.json renders/demo.mp4 --format all     # demo-4x5.mp4, demo-1x1.mp4, …
+```
+
+`size`, `window` and `layout` (`{"caption": {...}, "toast": {...}}`) in the edit adjust its own
+format only; other formats use their presets. A shot can be nudged for one format:
+
+```json
+"para": { "fit": ["para1", "para2"], "dy": -100, "1:1": { "dy": 20 } }
 ```
 
 ## brand
@@ -32,7 +56,7 @@
 
 ## window
 
-The browser window the take sits in: `x`, `y`, `w`, `h` (including the title bar), `bar` (title
+Optional: each format has its own. The browser window the take sits in: `x`, `y`, `w`, `h` (including the title bar), `bar` (title
 bar height), `r` (corner radius), `url` (shown in the address pill).
 
 ## shots
@@ -115,3 +139,15 @@ carry a licence (see `docs/music.md`):
 
 Licence fields (`license`, `title`, `artist`, `source`, `credit`) can sit in the music block or in
 the track's `.license.json` sidecar.
+
+## subtitles
+
+```json
+"subtitles": { "burn": true, "words": ["Heuristics", "Sawt"], "model": "base.en" }
+```
+
+`reel subtitles edit.json` transcribes what is said, locally, into `<build>/subtitles.srt`, in output
+times. Read it and fix any word: renders use the file as it is (`--again` re-transcribes). `words`
+steers the transcription toward names and jargon. With `burn`, cues are drawn near the bottom of
+the window; either way the `.srt` is written beside every render, for platforms that take caption
+files (LinkedIn, YouTube).

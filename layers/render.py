@@ -1,6 +1,6 @@
 """Render the overlay layers an edit needs as transparent PNGs, from HTML templates and the brand.
 
-    python layers/render.py edit.json        -> <build>/layers/*.png
+    python layers/render.py edit.json [--format 16:9]     -> <build>/layers/*.png
 
 Each layer is a full-canvas PNG (the video's size) so the compositor can lay it straight on top.
 Text is set by Chrome, so any script shapes correctly (Arabic, CJK) and system fonts work.
@@ -8,6 +8,8 @@ Text is set by Chrome, so any script shapes correctly (Arabic, CJK) and system f
 import html, json, pathlib, shutil, subprocess, sys
 
 from templates import TEMPLATES
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "compose"))
+import layout
 
 CHROME_CANDIDATES = [
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -35,9 +37,10 @@ b {{ color: var(--accent); }}
 {css}
 </style></head><body>{body}</body></html>"""
 
-def render(edit_path):
+def render(edit_path, fmt=None):
     edit_path = pathlib.Path(edit_path).resolve()
-    edit = json.loads(edit_path.read_text())
+    edit = layout.resolve(json.loads(edit_path.read_text()), fmt)
+    lay = edit["layout"]
     base = edit_path.parent
     out = base / edit.get("build", "build") / "layers"
     out.mkdir(parents=True, exist_ok=True)
@@ -52,9 +55,21 @@ def render(edit_path):
         if s.get("card"):
             jobs[s["card"]] = TEMPLATES[s["card"]](s, brand, size) if s["card"] in TEMPLATES else None
         for i, c in enumerate(s.get("captions", [])):
-            jobs[c.setdefault("id", f"cap-{edit['scenes'].index(s)}-{i}")] = TEMPLATES["caption"](c, brand, size)
+            jobs[c.setdefault("id", f"cap-{edit['scenes'].index(s)}-{i}")] = TEMPLATES["caption"](c, brand, size, lay)
         for i, k in enumerate(s.get("toasts", [])):
-            jobs[k.setdefault("id", f"toast-{edit['scenes'].index(s)}-{i}")] = TEMPLATES["toast"](k, brand, size)
+            jobs[k.setdefault("id", f"toast-{edit['scenes'].index(s)}-{i}")] = TEMPLATES["toast"](k, brand, size, lay)
+    subs = (edit.get("subtitles") or {})
+    srt = base / edit["baseBuild"] / "subtitles.srt"
+    cues = []
+    if subs.get("burn") and srt.exists():
+        import subtitles as _subs
+        cues = _subs.read_srt(srt)
+        for i, c in enumerate(cues):
+            c["id"] = f"sub-{i}"
+            jobs[c["id"]] = TEMPLATES["subtitle"](c, brand, size, edit["window"])
+    elif subs.get("burn"):
+        print(f"subtitles: burn is on but {srt} does not exist; run `reel subtitles` first")
+    (out / "subtitles.json").write_text(json.dumps(cues, indent=1))
     exe = chrome()
     for name, job in jobs.items():
         if job is None: continue
@@ -70,4 +85,5 @@ def render(edit_path):
 
 if __name__ == "__main__":
     sys.path.insert(0, str(pathlib.Path(__file__).parent))
-    render(sys.argv[1])
+    a = sys.argv[1:]
+    render(a[0], a[a.index("--format") + 1] if "--format" in a else None)

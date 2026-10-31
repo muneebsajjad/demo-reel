@@ -23,8 +23,8 @@
     "wide":  { "fit": ["title", { "rect": "card1", "dh": 330 }, "para3"], "pad": 30 },
     "card1": { "fit": [{ "rect": "card1", "dh": 330 }], "pad": 90, "minWidth": 1250, "dx": -190 },
     "top":   { "fit": ["title", "para1"], "pad": 40 },
-    "para":  { "fit": ["para1", "para2"], "pad": 20, "minWidth": 1500, "dy": -100 },
-    "para2": { "fit": ["para1", "para2"], "pad": 20, "minWidth": 1460, "dy": -100 },
+    "para":  { "fit": ["para1", "para2"], "pad": 20, "minWidth": 1500, "dy": -100, "1:1": { "dy": 20 } },
+    "para2": { "fit": ["para1", "para2"], "pad": 20, "minWidth": 1460, "dy": -100, "1:1": { "dy": 20 } },
     "heur":  { "fit": ["para3", { "rect": "card2", "dh": 480 }], "pad": 40 },
     "card2": { "fit": [{ "rect": "card2", "dh": 480 }], "pad": 90, "minWidth": 1000 }
   },
@@ -60,5 +60,6 @@
                "pill": "github.com/muneebsajjad/sawt", "sub": "Open source · on the Chrome Web Store" } }
   ],
 
-  "audio": { "loudness": -16, "music": null }
+  "audio": { "loudness": -16, "music": null },
+  "subtitles": { "burn": true, "words": ["Heuristics", "Astral Codex Ten"] }
 }

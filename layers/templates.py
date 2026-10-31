@@ -34,22 +34,26 @@ body {{ {_bg()} }}
             f'<div class="url">{lock}{w.get("url", "")}</div>{icon}</div></div>')
     return css, body
 
-def caption(c, brand, size):
-    top = c.get("top", 76)
+def caption(c, brand, size, lay=None):
+    L = {"left": 64, "top": 76, "width": size[0] - 128, "height": 250, "size": 58, "align": "left",
+         **((lay or {}).get("caption", {}))}
+    top = c.get("top", L["top"])
     css = f"""
-.cap {{ position: absolute; left: 64px; right: 64px; top: {top}px; height: 250px; display: flex;
-       flex-direction: column; justify-content: center; }}
-.kick {{ font-weight: 600; font-size: 22px; line-height: 1; letter-spacing: 3px; color: var(--accent);
-        text-transform: uppercase; margin-bottom: 18px; display: flex; align-items: center; gap: 14px; }}
+.cap {{ position: absolute; left: {L['left']}px; top: {top}px; width: {L['width']}px; height: {L['height']}px;
+       display: flex; flex-direction: column; justify-content: center; text-align: {L['align']}; }}
+.kick {{ font-weight: 600; font-size: {round(L['size'] * 0.38)}px; line-height: 1; letter-spacing: 3px; color: var(--accent);
+        text-transform: uppercase; margin-bottom: {round(L['size'] * 0.31)}px; display: flex; align-items: center; gap: 14px; }}
 .kick::before {{ content: ""; width: 34px; height: 3px; border-radius: 2px; background: var(--accent-2); }}
-h2 {{ margin: 0; font-size: {c.get('size', 58)}px; line-height: 1.12; letter-spacing: -1.4px; font-weight: 700; }}
+h2 {{ margin: 0; font-size: {c.get('size', L['size'])}px; line-height: 1.12; letter-spacing: -1.4px; font-weight: 700; }}
 """
     kick = f'<div class="kick mono">{c["kicker"]}</div>' if c.get("kicker") else ""
     return css, f'<div class="cap">{kick}<h2>{c["text"]}</h2></div>'
 
-def toast(k, brand, size):
+def toast(k, brand, size, lay=None):
+    T = {"bottom": 112, **((lay or {}).get("toast", {}))}
+    left = f"{T['cx']}px" if "cx" in T else "50%"
     css = f"""
-.t {{ position: absolute; left: 50%; bottom: {k.get('bottom', 112)}px; transform: translateX(-50%); display: flex;
+.t {{ position: absolute; left: {left}; bottom: {k.get('bottom', T['bottom'])}px; transform: translateX(-50%); display: flex;
      align-items: center; gap: 14px; padding: 16px 26px 16px 18px; background: rgba(22,24,29,.92); color: #fff;
      border-radius: 18px; font-size: 30px; font-weight: 500; box-shadow: 0 12px 30px -6px rgba(0,0,0,.35); white-space: nowrap; }}
 kbd {{ font: 700 30px/1 -apple-system, sans-serif; color: #16181d; background: linear-gradient(#fff, #e9ecef);
@@ -97,4 +101,17 @@ li::before {{ content: "✓"; color: var(--accent); font-weight: 700; margin-rig
     sub = f'<div class="sub">{e["sub"]}</div>' if e.get("sub") else ""
     return css, f'{_logo(brand, e.get("logoWidth", 190))}<h1>{e.get("name", brand.get("name", ""))}</h1><ul>{items}</ul>{pill}{sub}'
 
-TEMPLATES = {"window": window, "caption": caption, "toast": toast, "title": title, "end": end}
+def subtitle(cue, brand, size, win):
+    """One cue: light text on a dark pill, centred near the bottom of the window."""
+    fs = 34 if size[0] <= 1080 else 38
+    css = f"""
+.s {{ position: absolute; left: {win['x'] + win['w'] / 2}px; bottom: {size[1] - (win['y'] + win['h']) + 30}px;
+     transform: translateX(-50%); max-width: {win['w'] - 100}px; width: max-content; text-align: center;
+     background: rgba(16,18,22,.82); color: #fff; border-radius: 12px; padding: 10px 20px;
+     font-size: {fs}px; line-height: 1.25; font-weight: 600; letter-spacing: -.2px;
+     box-shadow: 0 6px 18px -6px rgba(0,0,0,.35); }}
+"""
+    import html as _h
+    return css, f'<div class="s">{_h.escape(cue["text"])}</div>'
+
+TEMPLATES = {"subtitle": subtitle, "window": window, "caption": caption, "toast": toast, "title": title, "end": end}

@@ -35,6 +35,8 @@ scenario.mjs ──▶ reel take ──▶ take.mov + take.json ──▶ edit.j
 - **`compose/`** — the compositor: crops the 2x recording through an eased camera, lays the overlays
   on, dissolves between scenes, cuts the sound with the picture and normalises it.
 - **`qa/`** — where the sound is (to cut in pauses), contact sheets, length and loudness.
+- **Formats and subtitles** — one edit renders 4:5, 1:1, 9:16 and 16:9; what is said is
+  transcribed locally into an editable `.srt`, exported with every render and optionally burned in.
 - **Music** — ships with a small CC0 library ([library/](library/README.md), 7 tracks, 7.4 MB) and
   picks a bed that suits the video by default (its pace, speech and captions against
   each track's measured tempo, energy and steadiness), or uses your own. Every track's licence is
@@ -93,8 +95,7 @@ products need them:
 
 - desktop apps (an accessibility-scripting driver; the recorder already takes any `--app`)
 - a tested local music generator (ACE-Step)
-- voiceover, and burned-in subtitles of what is said
-- 16:9 and 1:1 layouts alongside 4:5
+- voiceover from text, for products that make no sound
 - more card and transition templates
 
 Contributions welcome: open an issue with the product you want to demo and what got in the way.

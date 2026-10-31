@@ -43,6 +43,7 @@ EDIT = {
         {"card": "end", "dur": 0.6, "end": {"points": ["one"], "pill": "example.com"}},
     ],
     "audio": {"music": None, "loudness": -16},
+    "subtitles": {"burn": True},
 }
 
 @pytest.fixture(scope="module")
@@ -50,6 +51,8 @@ def rendered(tmp_path_factory):
     d = tmp_path_factory.mktemp("render")
     make_take(d)
     (d / "edit.json").write_text(json.dumps(EDIT))
+    (d / "build").mkdir()
+    (d / "build" / "subtitles.srt").write_text("1\n00:00:00,600 --> 00:00:01,400\nA test subtitle\n")
     py = sys.executable
     subprocess.run([py, str(ROOT / "layers/render.py"), str(d / "edit.json")], check=True, capture_output=True)
     out = d / "out.mp4"
@@ -69,7 +72,7 @@ def test_length(rendered):
     assert d == pytest.approx(2.6, abs=0.15)
 
 def test_camera_frames_the_red_box(rendered):
-    f = frame_at(rendered, 1.0)
+    f = frame_at(rendered, 1.7)                        # no subtitle on screen at this moment
     # shot: box 480..620 x 180..300 (pad 20) seen through a 300x250 viewport at (10, 130)
     vx, vy, vw, vh = 10, 130, 300, 250
     red = (f[..., 0] > 180) & (f[..., 1] < 90) & (f[..., 2] < 90)
@@ -85,6 +88,13 @@ def test_the_caption_is_drawn_above_the_window(rendered):
     f = frame_at(rendered, 1.0)
     band = f[60:330, 20:300]                           # where the caption sits (top 76 px + 250)
     assert (band.sum(2) < 200).mean() > 0.002          # some dark caption text
+
+def test_subtitles_are_burned_in_and_exported(rendered):
+    vx, vy, vw, vh = 10, 130, 300, 250
+    pill = lambda f: (f[vy + vh - 60: vy + vh - 5, vx: vx + vw].sum(2) < 120).mean()   # dark pill near the bottom
+    assert pill(frame_at(rendered, 1.0)) > 0.05            # during the cue
+    assert pill(frame_at(rendered, 1.9)) < 0.01            # after it
+    assert rendered.with_suffix(".srt").read_text().count("A test subtitle") == 1
 
 def test_sound_lands_where_the_edit_puts_it(rendered):
     raw = subprocess.run(["ffmpeg", "-loglevel", "error", "-i", str(rendered), "-ac", "1", "-ar", "8000",

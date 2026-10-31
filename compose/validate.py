@@ -18,6 +18,13 @@ def validate(edit, base, log=None):
     err = errs.append
     base = pathlib.Path(base)
 
+    import layout
+    if edit.get("format", "4:5") not in layout.PRESETS:
+        err(f"format: {edit['format']!r} is not one of {', '.join(layout.PRESETS)}")
+    try:
+        edit = layout.resolve(edit) if "window" not in edit or "layout" not in edit else edit
+    except ValueError as e:
+        return errs + [str(e)]
     for key in ["take", "window", "scenes", "brand"]:
         if key not in edit: err(f"{key}: missing")
     if errs: return errs
@@ -106,6 +113,16 @@ def validate(edit, base, log=None):
                         if c["at"] >= s["dur"]: err(f"scenes[{i}].{kind}[{j}]: starts after the scene ends ({s['dur']:.2f}s)")
         except (ValueError, KeyError, TypeError) as e:
             err(f"scenes: {e}")
+
+    subs = edit.get("subtitles")
+    if subs is not None:
+        if not isinstance(subs, dict): err("subtitles: a block like {\"burn\": true}")
+        else:
+            unknown = set(subs) - {"burn", "words", "model"}
+            if unknown: err(f"subtitles: unknown option{'s' * (len(unknown) > 1)} {', '.join(sorted(unknown))}")
+            if "words" in subs and not isinstance(subs["words"], list): err("subtitles.words: a list of words")
+    for name in edit.get("formats", []):
+        if name not in layout.PRESETS: err(f"formats: {name!r} is not one of {', '.join(layout.PRESETS)}")
 
     spec = edit.get("audio", {}).get("music", "auto")
     if isinstance(spec, dict) and spec.get("file") and not spec.get("auto"):

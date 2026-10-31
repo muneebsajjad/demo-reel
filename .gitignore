@@ -12,3 +12,4 @@ examples/*/build/
 .DS_Store
 __pycache__/
 examples/*/music/
+*.part.mp4

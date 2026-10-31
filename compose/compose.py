@@ -14,10 +14,14 @@ from PIL import Image, ImageDraw, ImageFilter
 args = sys.argv[1:]
 EDIT_PATH = pathlib.Path(args[0]).resolve()
 BASE = EDIT_PATH.parent
-EDIT = json.loads(EDIT_PATH.read_text())
+sys.path.insert(0, str(pathlib.Path(__file__).parent))
+import layout
+FORMAT = args[args.index("--format") + 1] if "--format" in args else None
+EDIT = layout.resolve(json.loads(EDIT_PATH.read_text()), FORMAT)
 BUILD = BASE / EDIT.get("build", "build")
 LAYERS = BUILD / "layers"
-OUT = pathlib.Path(args[args.index("--out") + 1]).resolve() if "--out" in args else BASE / "renders" / "demo.mp4"
+OUT = pathlib.Path(args[args.index("--out") + 1]).resolve() if "--out" in args else \
+    BASE / "renders" / f"demo-{layout.slug(EDIT['format'])}.mp4"
 STILLS = [float(x) for x in args[args.index("--stills") + 1].split(",")] if "--stills" in args else None
 # --audio-only <video>: rebuild only the sound (e.g. another music track) onto an existing render
 AUDIO_ONLY = pathlib.Path(args[args.index("--audio-only") + 1]).resolve() if "--audio-only" in args else None
@@ -73,7 +77,8 @@ class Reader:
         self.size = (w, h)
         self.p = subprocess.Popen(["ffmpeg", "-loglevel", "error", "-ss", f"{max(0, start):.3f}", "-i", str(TAKE),
                                    "-t", f"{dur:.3f}", "-vf", f"fps={FPS},crop={w}:{h}:{x}:{y}",
-                                   "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], stdout=subprocess.PIPE)
+                                   "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], stdout=subprocess.PIPE,
+                                  stderr=subprocess.DEVNULL)      # it is fine to stop reading early
         self.n, self.cur = -1, None
     def at(self, t):
         want = max(0, round((t - max(0, self.start)) * FPS))
@@ -121,6 +126,9 @@ class ImageScene:
     def __init__(self, s):
         self.s = s
         width = s.get("width", 480)
+        # no taller than 92% of the window: measure the tallest image at this width, shrink if needed
+        tallest = max(Image.open(BASE / p).size[1] / Image.open(BASE / p).size[0] for p in s["images"])
+        width = int(min(width, VH * 0.92 / tallest * 1.08))     # the empty bottom is trimmed below
         ims = []
         for p in s["images"]:
             im = Image.open(BASE / p).convert("RGB")
@@ -137,7 +145,7 @@ class ImageScene:
             return a
         self.imgs = [padded(i) for i in ims]
         self.w = width
-        self.x, self.y = (W - width) // 2, VY + (VH - self.h) // 2
+        self.x, self.y = VX + (VW - width) // 2, VY + (VH - self.h) // 2     # centred in the window
         pm = Image.new("L", (width, self.h), 0)
         ImageDraw.Draw(pm).rounded_rectangle([0, 0, width - 1, self.h - 1], radius=16, fill=255)
         self.mask = np.asarray(pm).astype(np.float32)[..., None] / 255
@@ -176,7 +184,8 @@ class ImageScene:
 
 images = {i: ImageScene(s) for i, s in enumerate(SCENES) if "images" in s}
 cards = {s["card"]: load(LAYERS / f"{s['card']}.png") for s in SCENES if s.get("card")}
-overlays = {}
+SUBS = json.loads((LAYERS / "subtitles.json").read_text()) if (LAYERS / "subtitles.json").exists() else []
+overlays = {c["id"]: load(LAYERS / f"{c['id']}.png") for c in SUBS}
 for s in SCENES:
     for c in s.get("captions", []) + s.get("toasts", []):
         overlays[c["id"]] = load(LAYERS / f"{c['id']}.png")
@@ -221,6 +230,10 @@ def frame(t):
             f = scene_frame(si, t - s["start"]) * w
             acc, wsum = (f if acc is None else acc + f), wsum + w
         out = acc / max(wsum, 1e-6)
+    for c in SUBS:
+        if c["start"] - 0.1 <= t <= c["end"] + 0.1:
+            a = min(1, (t - c["start"] + 0.1) / 0.1, (c["end"] + 0.1 - t) / 0.1)
+            if a > 0: out = over(out, overlays[c["id"]], a)
     for s in SCENES:
         for c in s.get("captions", []):
             t0, t1 = s["start"] + c["at"], s["start"] + c["until"]
@@ -349,13 +362,18 @@ af = "aresample=48000" if silent else f"highpass=f=70,{loudnorm_args(audio, targ
 if AUDIO_ONLY:
     subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(AUDIO_ONLY), "-i", str(audio), "-map", "0:v",
                     "-map", "1:a", "-c:v", "copy", "-af", af, "-c:a", "aac", "-b:a", "192k", "-shortest",
-                    "-movflags", "+faststart", str(OUT)], check=True)
+                    "-movflags", "+faststart", str(OUT.with_name("." + OUT.name + ".part.mp4"))], check=True)
+    OUT.with_name("." + OUT.name + ".part.mp4").replace(OUT)
     print("wrote", OUT)
     sys.exit()
+PART = OUT.with_name(f".{OUT.stem}.{__import__('os').getpid()}.part.mp4")   # written here, renamed when done
+SRT = BASE / EDIT["baseBuild"] / "subtitles.srt"
+if SRT.exists():                                    # always offer the caption file beside the video
+    import shutil; shutil.copy(SRT, OUT.with_suffix(".srt")); print("subtitles:", OUT.with_suffix(".srt"))
 enc = subprocess.Popen(["ffmpeg", "-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24",
                         "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-", "-i", str(audio), "-af", af,
                         "-c:v", "libx264", "-preset", "slow", "-crf", "16", "-profile:v", "high", "-pix_fmt", "yuv420p",
-                        "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart", str(OUT)],
+                        "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart", str(PART)],
                        stdin=subprocess.PIPE)
 n = int(round(TOTAL * FPS))
 rng = np.random.default_rng(0)
@@ -363,5 +381,7 @@ for i in range(n):
     f = frame(i / FPS) + (rng.random((H, W, 1), np.float32) - 0.5) / 255     # dither: no banding
     enc.stdin.write((f * 255).clip(0, 255).astype(np.uint8).tobytes())
     if i % 90 == 0: print(f"frame {i}/{n}", flush=True)
-enc.stdin.close(); enc.wait()
+enc.stdin.close()
+if enc.wait() != 0: raise SystemExit(f"encoding failed; {OUT} was left as it was")
+PART.replace(OUT)                                   # only a finished render ever takes the name
 print("wrote", OUT, f"{TOTAL:.2f}s")
