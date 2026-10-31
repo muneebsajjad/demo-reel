@@ -1,0 +1,148 @@
+<!doctype html>
+<!-- Tidy: a tiny task board, made to be demoed. It exists so anyone can try demo-reel without an
+     account or a product of their own. Everything is in this one file; nothing is saved. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tidy — your week, in order</title>
+<style>
+  :root {
+    --bg: #f6f7fb; --panel: #ffffff; --ink: #1d2030; --muted: #6b7088; --line: #e4e6ef;
+    --accent: #5b5bd6; --accent-2: #8b8bf0; --todo: #f2f3f8; --doing: #fff6e5; --done: #e9f8f0;
+    --shadow: 0 1px 2px rgba(20, 22, 40, .06), 0 6px 18px -6px rgba(20, 22, 40, .18);
+  }
+  :root[data-theme="dark"] {
+    --bg: #14151c; --panel: #1d1f29; --ink: #eceef6; --muted: #9297ad; --line: #2b2e3b;
+    --accent: #8b8bf0; --accent-2: #b3b3ff; --todo: #22242f; --doing: #2d2618; --done: #182a22;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 22px -8px rgba(0, 0, 0, .6);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.45 -apple-system, "SF Pro Text", "Segoe UI", sans-serif;
+         transition: background .35s, color .35s; -webkit-font-smoothing: antialiased; }
+  header { display: flex; align-items: center; gap: 14px; padding: 22px 40px; }
+  .logo { width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg, var(--accent), var(--accent-2));
+          display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 18px; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: -.3px; }
+  .week { color: var(--muted); font-size: 14px; margin-left: 4px; }
+  .spacer { flex: 1; }
+  .progress { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); }
+  .bar { width: 160px; height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent-2));
+           border-radius: 4px; transition: width .5s cubic-bezier(.2, .8, .2, 1); }
+  button.theme { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 10px;
+                 width: 40px; height: 40px; font-size: 18px; cursor: pointer; box-shadow: var(--shadow); }
+  .add { margin: 4px 40px 22px; display: flex; gap: 10px; }
+  .add input { flex: 1; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 12px;
+               padding: 14px 16px; font: inherit; outline: none; box-shadow: var(--shadow); transition: border-color .2s; }
+  .add input:focus { border-color: var(--accent); }
+  .add button { border: 0; border-radius: 12px; padding: 0 22px; background: var(--accent); color: #fff; font: 600 15px/1 inherit;
+                cursor: pointer; box-shadow: var(--shadow); }
+  main { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; padding: 0 40px 40px; }
+  .col { border-radius: 16px; padding: 14px; min-height: 420px; transition: background .35s, outline-color .2s;
+         outline: 2px dashed transparent; outline-offset: -2px; }
+  .col[data-col="todo"] { background: var(--todo); } .col[data-col="doing"] { background: var(--doing); }
+  .col[data-col="done"] { background: var(--done); }
+  .col.over { outline-color: var(--accent); }
+  .col h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); margin: 4px 6px 12px;
+            display: flex; justify-content: space-between; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px;
+          box-shadow: var(--shadow); display: flex; align-items: center; gap: 10px; cursor: grab; user-select: none;
+          transition: transform .2s, opacity .2s, background .35s, border-color .35s; animation: pop .35s cubic-bezier(.2, .9, .3, 1.3); }
+  @keyframes pop { from { transform: scale(.9); opacity: 0; } }
+  .card.dragging { position: fixed; z-index: 10; pointer-events: none; transform: rotate(2.5deg) scale(1.03);
+                   box-shadow: 0 18px 40px -10px rgba(20, 22, 40, .45); transition: none; animation: none; }
+  .card .tick { width: 20px; height: 20px; border-radius: 6px; border: 2px solid var(--line); flex: none; display: grid;
+                place-items: center; color: transparent; font-size: 13px; transition: all .25s; }
+  .col[data-col="done"] .card .tick { background: #2fb170; border-color: #2fb170; color: #fff; }
+  .col[data-col="done"] .card .t { color: var(--muted); text-decoration: line-through; }
+  .tag { margin-left: auto; font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--line); color: var(--muted); }
+  .ghost { height: 46px; border-radius: 12px; border: 2px dashed var(--accent); margin-bottom: 10px; opacity: .6; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">T</div><h1>Tidy</h1><span class="week">This week</span>
+  <div class="spacer"></div>
+  <div class="progress"><span id="pct">0% done</span><div class="bar"><i id="bar"></i></div></div>
+  <button class="theme" id="theme" title="Dark mode" aria-label="Toggle dark mode">☾</button>
+</header>
+<form class="add" id="add"><input id="new" placeholder="Add a task and press Enter…" autocomplete="off"><button>Add</button></form>
+<main>
+  <section class="col" data-col="todo"><h2>To do <span class="n"></span></h2></section>
+  <section class="col" data-col="doing"><h2>Doing <span class="n"></span></h2></section>
+  <section class="col" data-col="done"><h2>Done <span class="n"></span></h2></section>
+</main>
+<script>
+  const seed = [["todo", "Write the launch post", "Mon"], ["todo", "Record the demo", "Tue"],
+                ["doing", "Fix the signup bug", "Today"], ["done", "Pick a name", "Fri"]];
+  const col = (c) => document.querySelector(`.col[data-col="${c}"]`);
+  function card(text, tag) {
+    const el = document.createElement("div");
+    el.className = "card";
+    el.innerHTML = `<span class="tick">✓</span><span class="t"></span>${tag ? `<span class="tag">${tag}</span>` : ""}`;
+    el.querySelector(".t").textContent = text;
+    el.addEventListener("pointerdown", startDrag);
+    return el;
+  }
+  function count() {
+    const all = document.querySelectorAll(".card:not(.dragging)").length;
+    const done = col("done").querySelectorAll(".card").length;
+    document.querySelectorAll(".col").forEach((c) => (c.querySelector(".n").textContent = c.querySelectorAll(".card").length));
+    const pct = all ? Math.round((done / all) * 100) : 0;
+    document.getElementById("bar").style.width = pct + "%";
+    document.getElementById("pct").textContent = pct + "% done";
+  }
+  seed.forEach(([c, t, tag]) => col(c).append(card(t, tag)));
+  count();
+
+  document.getElementById("add").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const input = document.getElementById("new");
+    if (!input.value.trim()) return;
+    col("todo").insertBefore(card(input.value.trim(), "New"), col("todo").querySelector(".card"));
+    input.value = ""; count();
+  });
+
+  // dragging with pointer events (works with real and automated mice alike)
+  let drag = null;
+  function startDrag(e) {
+    const el = e.currentTarget, r = el.getBoundingClientRect();
+    drag = { el, dx: e.clientX - r.left, dy: e.clientY - r.top, ghost: document.createElement("div") };
+    drag.ghost.className = "ghost"; drag.ghost.style.height = r.height + "px";
+    el.after(drag.ghost);
+    el.classList.add("dragging"); el.style.width = r.width + "px";
+    move(e);
+    addEventListener("pointermove", move); addEventListener("pointerup", drop, { once: true });
+  }
+  function target(x, y) {
+    return [...document.querySelectorAll(".col")].find((c) => { const r = c.getBoundingClientRect();
+      return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; });
+  }
+  function move(e) {
+    if (!drag) return;
+    drag.el.style.left = e.clientX - drag.dx + "px"; drag.el.style.top = e.clientY - drag.dy + "px";
+    const c = target(e.clientX, e.clientY);
+    document.querySelectorAll(".col").forEach((x) => x.classList.toggle("over", x === c));
+    if (c) {
+      const after = [...c.querySelectorAll(".card:not(.dragging)")].find((k) => e.clientY < k.getBoundingClientRect().top + k.offsetHeight / 2);
+      after ? c.insertBefore(drag.ghost, after) : c.append(drag.ghost);
+    }
+  }
+  function drop() {
+    removeEventListener("pointermove", move);
+    drag.ghost.replaceWith(drag.el);
+    drag.el.classList.remove("dragging"); drag.el.removeAttribute("style");
+    document.querySelectorAll(".col").forEach((x) => x.classList.remove("over"));
+    drag = null; count();
+  }
+
+  document.getElementById("theme").addEventListener("click", () => {
+    const dark = document.documentElement.dataset.theme !== "dark";
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+    document.getElementById("theme").textContent = dark ? "☀" : "☾";
+  });
+</script>
+</body>
+</html>

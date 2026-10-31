@@ -72,13 +72,21 @@ GEO = timeline.Frame(PAGE[2], PAGE[3], ASPECT, RECTS, EDIT.get("shots", {}))
 EVENTS = LOG.get("events", [])
 TOTAL = timeline.build(SCENES, EVENTS)
 
+# the picture's own length: the file's can be longer (sound runs on after the last changed frame)
+TAKE_DUR = float(subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=duration",
+                                 "-of", "csv=p=0", str(TAKE)], capture_output=True, text=True).stdout.strip() or 0)
+
 class Reader:
     """Frames of the take's page viewport from `start`, in order, at FPS."""
     def __init__(self, start, dur):
+        if TAKE_DUR: start = min(start, TAKE_DUR - 0.5)      # past the end of the take: hold its last frames
         self.start, (x, y, w, h) = start, PAGE
         self.size = (w, h)
         self.p = subprocess.Popen(["ffmpeg", "-loglevel", "error", "-ss", f"{max(0, start):.3f}", "-i", str(TAKE),
-                                   "-t", f"{dur:.3f}", "-vf", f"fps={FPS},crop={w}:{h}:{x}:{y}",
+                                   "-t", f"{dur:.3f}",
+                                   # the recorder only writes a frame when the screen changes: a still
+                                   # ending stops the file early, so hold the last frame as long as asked
+                                   "-vf", f"fps={FPS},crop={w}:{h}:{x}:{y},tpad=stop_mode=clone:stop_duration=60",
                                    "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], stdout=subprocess.PIPE,
                                   stderr=subprocess.DEVNULL)      # it is fine to stop reading early
         self.n, self.cur = -1, None

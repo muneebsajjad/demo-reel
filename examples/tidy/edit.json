@@ -1,0 +1,52 @@
+{
+  "format": "4:5",
+  "formats": ["4:5", "16:9"],
+  "fps": 30,
+  "take": "takes/take1",
+  "build": "build",
+  "transition": 0.4,
+  "dip": [246, 247, 251],
+
+  "brand": {
+    "name": "Tidy",
+    "accent": "#5b5bd6",
+    "accentLight": "#8b8bf0",
+    "background": ["#ffffff", "#f5f5ff", "#e8e8fb"]
+  },
+
+  "window": { "url": "tidy.app" },
+
+  "shots": {
+    "wide":   { "fit": [{ "x": 80, "y": 40, "width": 1880, "height": 100 }, { "rect": "todo", "dh": -500 },
+                        { "rect": "doing", "dh": -500 }], "pad": 30 },
+    "add":    { "fit": [{ "rect": "add", "dw": -1500 }, { "rect": "todo", "dh": -560 }], "pad": 40 },
+    "move":   { "fit": [{ "rect": "todo", "dh": -500 }, { "rect": "doing", "dh": -500 }], "pad": 50 },
+    "finish": { "fit": [{ "rect": "doing", "dh": -500 }, { "rect": "done", "dh": -500 }, "progress"], "pad": 50 },
+    "board":  { "fit": [{ "rect": "doing", "dh": -500 }, { "rect": "done", "dh": -500 }, "progress"], "pad": 50 }
+  },
+
+  "scenes": [
+    { "card": "title", "dur": 2.2,
+      "title": { "badge": "A demo-reel example", "tagline": "Your week,<br><b>in order.</b>" } },
+
+    { "take": [["add-0.6", "move-0.1"]],
+      "camera": [["add-0.6", "wide"], ["add+0.3", "wide"], ["add+1.4", "add"]],
+      "captions": [{ "at": 0.2, "until": -0.1, "kicker": "Capture", "text": "Jot it down<br><b>the moment you think of it.</b>" }] },
+
+    { "take": [["move-0.2", "finish-0.1"]],
+      "camera": [["move-0.2", "move"]],
+      "captions": [{ "at": 0.15, "until": -0.1, "kicker": "Move", "text": "Drag it along<br><b>as the work moves.</b>" }] },
+
+    { "take": [["finish-0.2", "dark-0.1"]],
+      "camera": [["finish-0.2", "finish"]],
+      "captions": [{ "at": 0.15, "until": -0.1, "kicker": "Finish", "text": "Watch the week<br><b>come together.</b>" }] },
+
+    { "take": [["dark-0.2", "end+0.3"]],
+      "camera": [["dark-0.2", "board"]],
+      "captions": [{ "at": 0.15, "until": -0.1, "kicker": "Dark mode", "text": "Easy on the eyes,<br><b>late at night.</b>" }] },
+
+    { "card": "end", "dur": 3.4,
+      "end": { "points": ["A product video, made by an agent", "Recorded live, edited in code", "Free and open source"],
+               "pill": "github.com/muneebsajjad/demo-reel", "sub": "Tidy is a demo app that ships with demo-reel" } }
+  ]
+}

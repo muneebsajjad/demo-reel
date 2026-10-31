@@ -6,11 +6,20 @@ MP4 ready to post: no video editor, no timeline.
 
 [![CI](https://github.com/muneebsajjad/demo-reel/actions/workflows/ci.yml/badge.svg)](https://github.com/muneebsajjad/demo-reel/actions/workflows/ci.yml)
 
+![A 20-second video of Tidy, made by demo-reel](docs/assets/tidy.gif)
+
+*Made by demo-reel from [`examples/tidy`](examples/tidy), a demo app that ships with it: the take
+is the app running live; captions, camera, cards and music were added in code.
+Full videos: [Tidy 16:9](https://github.com/muneebsajjad/demo-reel/releases/download/v0.2.0/tidy-16x9.mp4) ·
+[Tidy 4:5](https://github.com/muneebsajjad/demo-reel/releases/download/v0.2.0/tidy-4x5.mp4) ·
+[Sawt 4:5, with subtitles](https://github.com/muneebsajjad/demo-reel/releases/download/v0.2.0/sawt-4x5.mp4)*
+
+**Try it:** [your first video in 10 minutes](docs/first-video.md), no account or product needed.
+
 ![Frames from the Sawt 0.2 demo](docs/assets/sawt-sheet.png)
 
-*Frames from [`examples/sawt`](examples/sawt): a 31-second LinkedIn video for
-[Sawt](https://github.com/muneebsajjad/sawt), recorded and edited end to end by Claude Code.
-[Watch it](https://github.com/muneebsajjad/demo-reel/releases/download/v0.1.0/sawt-0.2-example.mp4).*
+*Frames from [`examples/sawt`](examples/sawt): a LinkedIn launch video for the
+[Sawt](https://github.com/muneebsajjad/sawt) Chrome extension, recorded and edited end to end by Claude Code.*
 
 It is a [Claude Code skill](https://docs.claude.com/en/docs/claude-code/skills): you tell the agent
 what to show, and it writes the scenario, records takes, writes the edit, checks stills and renders.
@@ -99,7 +108,8 @@ products need them:
 - voiceover from text, for products that make no sound
 - more card and transition templates
 
-Contributions welcome: open an issue with the product you want to demo and what got in the way.
+Contributions welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). The most useful thing is trying it on
+your product and opening a "My product" issue about what got in the way.
 
 ## License
 
