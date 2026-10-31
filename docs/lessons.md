@@ -61,3 +61,19 @@ before recording a new product.
   top few before a video is called done.
 - **Respect sites that refuse scripts.** ccMixter answers 403 to scripted downloads. Its tracks are
   ranked from catalogue data and handed over as links; nothing pretends to be a browser.
+
+## A second product (Excalidraw, a drawing app)
+
+What a click-and-drag product with no sound changed:
+
+- **No pointer, no story.** Shapes appeared and colours changed with nothing doing it. The driver
+  now draws an on-page pointer that follows the automated mouse, with a ripple on click, eased
+  moves along a slight curve, and typing at a human rhythm.
+- **Canvas drawings have no element**, so `api.rect` takes a literal box: the one you drew into.
+- **Portrait windows are narrow.** A shot fitting a side panel and a diagram needed 2488 px of page
+  width; a 4:5 window shows 1943, so 22% was silently cut. `reel check` now warns about it for each
+  format the edit renders.
+- **Silence is handled by music.** With no voice, the auto-picker read the captions (warm), the pace
+  and the length, chose a bundled bed offline and set it louder than it would sit under speech.
+- **Wait for the page, then act through its controls.** Clicking by `title` / `aria-label`
+  survived the panel appearing in a different place than in the probe.

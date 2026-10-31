@@ -13,3 +13,4 @@ examples/*/build/
 __pycache__/
 examples/*/music/
 *.part.mp4
+local/

@@ -43,7 +43,7 @@ let t0 = 0, recording = null;
 const log = { events: [], rects: {} };
 const now = () => (t0 ? (Date.now() - t0) / 1000 : 0);
 const api = {
-  page, ctx, sleep, now, out,
+  page, ctx, sleep, now, out, get pointer() { return pointer; },
   inWorker: (fn, arg) => inWorker(ctx, fn, arg),
   extensionId: () => extensionId(ctx),
   mark(name, data = {}) {
@@ -58,6 +58,7 @@ const api = {
   async rect(name, target, arg) {
     const r = await (typeof target === "function"
       ? page.evaluate(target, arg)
+      : typeof target === "object" ? { ...target }            // literal CSS-px box (canvas drawings)
       : page.evaluate((sel) => document.querySelector(sel)?.getBoundingClientRect().toJSON(), target));
     if (r) r.dpr = await page.evaluate(() => devicePixelRatio);
     if (!r) throw new Error(`rect ${name}: nothing matched`);
@@ -65,6 +66,59 @@ const api = {
     log.rects[name] = { x: r.x * k, y: r.y * k, width: r.width * k, height: r.height * k, t: +now().toFixed(3) };
     return log.rects[name];
   },
+};
+
+// ---- a visible, human-paced pointer --------------------------------------------------------------
+const POINTER = () => {
+  if (window.__reelPointer) return;
+  window.__reelPointer = true;
+  const host = document.createElement("div");
+  host.style.cssText = "position:fixed;left:0;top:0;width:0;height:0;z-index:2147483647;pointer-events:none";
+  const root = host.attachShadow({ mode: "closed" });
+  root.innerHTML = `<style>
+    .c { position: fixed; left: 0; top: 0; width: 26px; height: 26px; transform: translate(-100px,-100px);
+         transition: opacity .2s; filter: drop-shadow(0 2px 3px rgba(0,0,0,.35)); }
+    .r { position: fixed; left: 0; top: 0; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%;
+         background: rgba(80, 90, 255, .28); transform: scale(0); opacity: 0; }
+    .r.on { animation: ripple .45s ease-out; }
+    @keyframes ripple { from { transform: scale(.2); opacity: 1 } to { transform: scale(1.1); opacity: 0 } }
+  </style><div class="r"></div><svg class="c" viewBox="0 0 26 26"><path d="M5 3 L5 21 L9.6 16.8 L12.8 23.4 L16 22 L12.9 15.6 L19 15.4 Z"
+    fill="#111" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
+  const c = root.querySelector(".c"), r = root.querySelector(".r");
+  const at = (e) => { c.style.transform = `translate(${e.clientX - 5}px, ${e.clientY - 3}px)`; };
+  addEventListener("pointermove", at, true);
+  addEventListener("pointerdown", (e) => { at(e); r.style.left = e.clientX + "px"; r.style.top = e.clientY + "px";
+    r.classList.remove("on"); void r.offsetWidth; r.classList.add("on"); }, true);
+  const mount = () => (document.body || document.documentElement).appendChild(host);
+  document.readyState === "loading" ? addEventListener("DOMContentLoaded", mount) : mount();
+};
+let pos = [cfg.width / 2, cfg.height / 3];
+const easeIO = (u) => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2);
+async function glide(to, ms) {
+  const from = pos, n = Math.max(2, Math.round(ms / 16));
+  const bow = [(to[1] - from[1]) * 0.08, (from[0] - to[0]) * 0.08];           // a slight natural curve
+  for (let i = 1; i <= n; i++) {
+    const u = easeIO(i / n), b = Math.sin(Math.PI * i / n);
+    await page.mouse.move(from[0] + (to[0] - from[0]) * u + bow[0] * b, from[1] + (to[1] - from[1]) * u + bow[1] * b);
+    await sleep(16);
+  }
+  pos = to;
+}
+async function pointAt(target) {
+  if (Array.isArray(target)) return target;
+  const box = await page.locator(target).first().boundingBox();
+  if (!box) throw new Error(`pointer: nothing matched ${target}`);
+  return [box.x + box.width / 2, box.y + box.height / 2];
+}
+const pointer = {
+  async show() { await page.addInitScript(POINTER); await page.evaluate(POINTER); await page.mouse.move(...pos); },
+  move: async (x, y, ms = 600) => glide([x, y], ms),
+  async click(target, ms = 600) { await glide(await pointAt(target), ms); await sleep(90); await page.mouse.down();
+    await sleep(70); await page.mouse.up(); await sleep(120); },
+  async drag(from, to, ms = 900) { await glide(await pointAt(from), 450); await page.mouse.down(); await sleep(60);
+    await glide(await pointAt(to), ms); await sleep(60); await page.mouse.up(); await sleep(120); },
+  async type(text, cps = 14) { for (const ch of text) { await page.keyboard.type(ch); await sleep(1000 / cps * (0.7 + Math.random() * 0.6)); } },
+  async key(k) { await page.keyboard.press(k); await sleep(120); },
 };
 
 await page.goto(cfg.url, { waitUntil: "commit", timeout: 60000 });

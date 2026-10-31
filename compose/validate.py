@@ -12,10 +12,12 @@ import music, timeline
 
 CARDS = {"title", "end"}
 
-def validate(edit, base, log=None):
-    """Return a list of problems (empty when the edit is good). `log` is the take log, if loaded."""
+def validate(edit, base, log=None, warnings=None):
+    """Return a list of problems (empty when the edit is good). `log` is the take log, if loaded.
+    Things that will render but probably not as meant are added to `warnings`, if a list is given."""
     errs = []
     err = errs.append
+    warn = warnings.append if warnings is not None else (lambda m: None)
     base = pathlib.Path(base)
 
     import layout
@@ -60,6 +62,11 @@ def validate(edit, base, log=None):
             if "fit" not in spec and not all(k in spec for k in ["cx", "cy", "w"]):
                 raise ValueError("needs either \"fit\" or \"cx\", \"cy\" and \"w\"")
             geo.shot(spec)
+            over = geo.overflow(spec)
+            if over:
+                warn(f"shots.{name}: needs {over[0]:.0f} px of page width but a {edit.get('format', '4:5')} window "
+                     f"shows at most {over[1]:.0f}; {100 * (1 - over[1] / over[0]):.0f}% will be cut off. "
+                     f"Fit fewer things, or adjust it for this format (\"{edit.get('format', '4:5')}\": {{...}})")
         except (KeyError, ValueError) as e:
             have = ", ".join(sorted(rects)) or "none"
             err(f"shots.{name}: {e.args[0]}" + (f" (rects in the take: {have})" if isinstance(e, KeyError) else ""))
@@ -138,8 +145,15 @@ def validate(edit, base, log=None):
     return errs
 
 def main():
+    import layout
     path = pathlib.Path(sys.argv[1]).resolve()
-    errs = validate(json.loads(path.read_text()), path.parent)
+    raw = json.loads(path.read_text())
+    warnings, errs = [], []
+    for fmt in dict.fromkeys([raw.get("format", "4:5")] + raw.get("formats", [])):   # each format it renders
+        w = []
+        errs += [e for e in validate(layout.resolve(raw, fmt), path.parent, warnings=w) if e not in errs]
+        warnings += [x for x in w if x not in warnings]
+    for x in warnings: print("  warning:", x)
     if errs:
         print(f"{path.name}: {len(errs)} problem{'s' * (len(errs) != 1)}")
         for e in errs: print("  -", e)

@@ -80,6 +80,18 @@ class Frame:
             return self.clamp((x0 + x1) / 2 + spec.get("dx", 0), (y0 + y1) / 2 + spec.get("dy", 0), w)
         return self.clamp(spec["cx"], spec["cy"], spec["w"])
 
+    def overflow(self, spec):
+        """How much of a fitted shot the page cannot show at this window's shape: (needed width,
+        allowed width) in px, or None when it fits. Explicit cx/cy/w shots are taken as meant."""
+        if isinstance(spec, str): spec = self.shots[spec]
+        if "fit" not in spec: return None
+        boxes = [self.rect(r) for r in spec["fit"]]
+        p = spec.get("pad", 60)
+        w = max(max(b[0] + b[2] for b in boxes) - min(b[0] for b in boxes) + 2 * p,
+                (max(b[1] + b[3] for b in boxes) - min(b[1] for b in boxes) + 2 * p) * self.aspect)
+        allowed = min(self.pw, self.ph * self.aspect)
+        return (w, allowed) if w > allowed * 1.02 else None
+
     def camera(self, keys, t):
         """Where the camera looks at take time t: eased between keys, zooming evenly in log width."""
         keys = [(k[0], self.shot(k[1])) for k in keys]

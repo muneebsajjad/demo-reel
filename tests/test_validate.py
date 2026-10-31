@@ -67,3 +67,10 @@ def test_music_without_a_licence_is_a_problem(tmp_path):
 def test_missing_take_files_are_reported(tmp_path):
     problems = validate.validate(EDIT, tmp_path)
     assert any("take.json not found" in p for p in problems)
+
+def test_shots_too_wide_for_the_window_are_warned_about():
+    e = copy.deepcopy(EDIT)
+    e["shots"]["both"] = {"fit": ["title", {"x": 1900, "y": 100, "width": 90, "height": 50}], "pad": 10}
+    warnings = []
+    assert validate.validate(e, ".", log=LOG, warnings=warnings) == []
+    assert any("shots.both" in w and "will be cut off" in w for w in warnings)

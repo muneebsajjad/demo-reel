@@ -96,3 +96,11 @@ def test_camera_holds_then_eases_between_keys(geo):
     assert mid[2] == pytest.approx((a[2] * b[2]) ** 0.5, rel=1e-6)      # halfway in log width
     with pytest.raises(KeyError):
         geo.camera([[0, "missing"]], 0)
+
+def test_overflow_reports_what_a_window_cannot_show():
+    wide = Frame(3000, 1000, 1.134, {"a": {"x": 0, "y": 400, "width": 100, "height": 100},
+                                     "b": {"x": 2400, "y": 400, "width": 100, "height": 100}}, {})
+    needed, allowed = wide.overflow({"fit": ["a", "b"], "pad": 50})
+    assert needed == pytest.approx(2600) and allowed == pytest.approx(1134)
+    assert wide.overflow({"fit": ["a"], "pad": 50}) is None
+    assert wide.overflow({"cx": 100, "cy": 100, "w": 99999}) is None      # explicit shots are taken as meant

@@ -69,6 +69,14 @@ export async function after(api) { /* stills to show as image scenes, e.g. a pop
   anchors to these marks, so a take that runs faster or slower still cuts in the right place.
 - **Record camera targets with `api.rect(name, selector | fn, arg)`** in viewport pixels. Elements
   in a closed shadow root cannot be measured: compute where they will be (see the Sawt cards).
+- **Click-driven products need a visible pointer.** Automation moves no real cursor, so shapes
+  appear and buttons press by themselves. Call `api.pointer.show()` in `setup`, then drive with
+  `api.pointer.click(selector | [x, y])`, `.drag(from, to)`, `.move(x, y)`, `.type(text)` and `.key(k)`:
+  an on-page arrow follows, clicks ripple, moves are eased and typing has human rhythm. Click
+  controls by selector (a `title` or `aria-label` is usually stable) so their positions come from
+  the page.
+- **Canvas content** (drawings, charts, maps) has no element to measure: record the box you drew
+  into with `api.rect(name, {x, y, width, height})` in CSS px.
 - Chrome extensions: run actions through the extension's own code with `api.inWorker(fn)`. An
   extension that relies on `activeTab` needs a recording copy with host access, because automation
   cannot press the browser's shortcuts (see `examples/sawt/prepare.sh`). Change nothing a viewer sees.
@@ -86,6 +94,9 @@ Write `edit.json` (reference: `docs/edit-format.md`). Rules that make it look ma
 
 - **Cut in pauses.** `bin/reel speech take1.mov` lists where there is sound; take pieces start
   just before a step and end before the next one starts. Anchor them to marks: `"sentence#5-0.15"`.
+- **Side-by-side content does not fit tall windows.** A toolbar on the left and a diagram on the
+  right can need more width than a 4:5 window shows; `reel check` warns, per format, how much a
+  fitted shot will lose. Fit fewer things, or nudge the shot for that format.
 - **Shots from rects.** `{"fit": ["title", {"rect": "card1", "dh": 330}], "pad": 60}`. One wide
   establishing shot, then push in to what the caption talks about. Keep text at least ~20 px tall in
   the output; a wide shot may go smaller for a moment, never for long.
