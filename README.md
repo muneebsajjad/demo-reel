@@ -7,7 +7,8 @@ MP4 ready to post: no video editor, no timeline.
 ![Frames from the Sawt 0.2 demo](docs/assets/sawt-sheet.png)
 
 *Frames from [`examples/sawt`](examples/sawt): a 31-second LinkedIn video for
-[Sawt](https://github.com/muneebsajjad/sawt), recorded and edited end to end by Claude Code.*
+[Sawt](https://github.com/muneebsajjad/sawt), recorded and edited end to end by Claude Code.
+[Watch it](https://github.com/muneebsajjad/demo-reel/releases/download/v0.1.0/sawt-0.2-example.mp4).*
 
 It is a [Claude Code skill](https://docs.claude.com/en/docs/claude-code/skills): you tell the agent
 what to show, and it writes the scenario, records takes, writes the edit, checks stills and renders.
