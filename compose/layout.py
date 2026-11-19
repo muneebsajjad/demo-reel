@@ -48,6 +48,9 @@ def resolve(edit, fmt=None):
             p["toast"] = {a: round(v * k) for a, v in p["toast"].items()}
         if "window" in edit: p["window"].update({k: v for k, v in edit["window"].items() if k != "url"})
         for k, v in edit.get("layout", {}).items(): p[k].update(v)
+    if fmt != own and edit.get("window", {}).get("bar") == 0:
+        # frameless (a desktop take) is a property of the recording, not of the layout: every format
+        p["window"].update(bar=0, fill=edit["window"].get("fill", "#000"))
     url = edit.get("window", {}).get("url", "")
     e["format"] = fmt
     e["size"] = p["size"]

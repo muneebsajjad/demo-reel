@@ -57,7 +57,9 @@ format only; other formats use their presets. A shot can be nudged for one forma
 ## window
 
 Optional: each format has its own. The browser window the take sits in: `x`, `y`, `w`, `h` (including the title bar), `bar` (title
-bar height), `r` (corner radius), `url` (shown in the address pill).
+bar height), `r` (corner radius), `url` (shown in the address pill). For a desktop take, `"bar": 0`
+draws a plain rounded screen instead of a browser window (`fill` colours it while it loads), since the
+recording already shows the apps' own title bars.
 
 ## shots
 
@@ -123,6 +125,30 @@ second image from a point, as a theme switch would:
 ```
 
 `from` is in the image's CSS pixels; `srcWidth` is the image's CSS width.
+
+**Spotlights** dim everything in the window except one rect of the take, and follow the camera:
+
+```json
+"spotlights": [{ "at": 0.9, "until": -0.2, "rect": "pill", "pad": 18, "dim": 0.42, "soft": 10 }]
+```
+
+`at` / `until` are scene seconds like captions (a negative `until` counts back from the end); `rect`
+is a name from the take or a literal box; `r` sets the corner radius (default: a capsule).
+
+## cinematic
+
+The touches that make a video look shot rather than screen-recorded. All are on by default; set any
+to `false` (or `drift` to `0`) to turn it off.
+
+```json
+"cinematic": { "drift": 0.025, "motionBlur": true, "enter": true, "words": true }
+```
+
+- `drift`: while a shot holds, the camera creeps in by this much (2.5% over 6 s), like a slow dolly,
+  so no frame sits dead still. It eases away during the next move, so nothing jumps.
+- `motionBlur`: fast camera moves blur like a 180° shutter (a few framings averaged per frame).
+- `enter`: the first time the take appears, the window rises in tilted back and settles flat (1 s).
+- `words`: caption headlines come in word by word; the kicker fades in first.
 
 ## audio
 

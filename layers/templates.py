@@ -5,6 +5,20 @@ def _bg():
     return ("background: radial-gradient(1200px 900px at 50% 40%, var(--bg-0) 0%, var(--bg-1) 55%, "
             "var(--bg-2) 100%);")
 
+def backdrop(edit, brand, size):
+    """The background alone, for the window to rise in over."""
+    return f"body {{ {_bg()} }}", ""
+
+def _words(text):
+    """Wrap each word of a headline in <span class="w">, keeping <b> and <br> where they are, so
+    the layer renderer can measure every word for a word-by-word reveal."""
+    import re
+    out = []
+    for part in re.split(r"(<[^>]+>)", text):
+        if part.startswith("<"): out.append(part); continue
+        out.append(re.sub(r"(\S+)", r'<span class="w">\1</span>', part))
+    return "".join(out)
+
 def window(edit, brand, size):
     w = edit["window"]
     icon = (f'<div class="ext"><img src="{brand["toolbarIcon"]}"></div>' if brand.get("toolbarIcon") else "")
@@ -29,6 +43,9 @@ body {{ {_bg()} }}
 """
     lock = ('<svg viewBox="0 0 12 12"><rect x="2" y="5.2" width="8" height="5.8" rx="1.3" fill="#7b8490"/>'
             '<path d="M4 5.5V3.8a2 2 0 0 1 4 0v1.7" stroke="#7b8490" stroke-width="1.4" fill="none"/></svg>')
+    if not w["bar"]:
+        # a desktop take: the recording already has the apps' own title bars, so just a screen
+        return css.replace("background: #fff;", f"background: {w.get('fill', '#000')};"), '<div class="win"></div>'
     body = (f'<div class="win"><div class="bar"><div class="dots"><i style="background:#ff5f57"></i>'
             f'<i style="background:#febc2e"></i><i style="background:#28c840"></i></div>'
             f'<div class="url">{lock}{w.get("url", "")}</div>{icon}</div></div>')
@@ -47,7 +64,7 @@ def caption(c, brand, size, lay=None):
 h2 {{ margin: 0; font-size: {c.get('size', L['size'])}px; line-height: 1.12; letter-spacing: -1.4px; font-weight: 700; }}
 """
     kick = f'<div class="kick mono">{c["kicker"]}</div>' if c.get("kicker") else ""
-    return css, f'<div class="cap">{kick}<h2>{c["text"]}</h2></div>'
+    return css, f'<div class="cap">{kick}<h2>{_words(c["text"])}</h2></div>'
 
 def toast(k, brand, size, lay=None):
     T = {"bottom": 112, **((lay or {}).get("toast", {}))}
@@ -114,4 +131,4 @@ def subtitle(cue, brand, size, win):
     import html as _h
     return css, f'<div class="s">{_h.escape(cue["text"])}</div>'
 
-TEMPLATES = {"subtitle": subtitle, "window": window, "caption": caption, "toast": toast, "title": title, "end": end}
+TEMPLATES = {"subtitle": subtitle, "backdrop": backdrop, "window": window, "caption": caption, "toast": toast, "title": title, "end": end}

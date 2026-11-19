@@ -71,3 +71,11 @@ def test_srt_round_trip(tmp_path):
 def test_read_srt_accepts_hand_edits(tmp_path):
     (tmp_path / "x.srt").write_text("1\n00:00:01.000 --> 00:00:02.000\nTwo\nlines\n\n\n2\n00:00:03,000 --> 00:00:04,000\n\n")
     assert subtitles.read_srt(tmp_path / "x.srt") == [{"start": 1.0, "end": 2.0, "text": "Two lines"}]
+
+def test_frameless_window_applies_to_every_format():
+    import layout
+    edit = {"format": "4:5", "window": {"bar": 0, "fill": "#123456"}, "scenes": []}
+    for fmt in ["4:5", "1:1", "9:16", "16:9"]:
+        w = layout.resolve(edit, fmt)["window"]
+        assert w["bar"] == 0 and w["fill"] == "#123456"
+    assert layout.resolve({"format": "4:5", "scenes": []}, "16:9")["window"]["bar"] > 0   # browser takes keep theirs

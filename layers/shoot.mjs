@@ -1,7 +1,7 @@
 // Screenshot many HTML layers in one browser session (a fresh Chrome per layer costs ~4 s each).
 //   node layers/shoot.mjs jobs.json      jobs: [{ html, png, width, height }]
 // Transparent background, device scale 1: the PNG is exactly width x height.
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { chromium } from "playwright-core";
 
@@ -17,6 +17,10 @@ for (const j of jobs) {
   await page.goto(pathToFileURL(j.html).href, { waitUntil: "load" });
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: j.png, omitBackground: true });
+  if (j.words) {                       // boxes of the headline's words, in layer pixels
+    const boxes = await page.$$eval("h2 .w", (ws) => ws.map((w) => w.getBoundingClientRect().toJSON()));
+    writeFileSync(j.words, JSON.stringify(boxes));
+  }
   console.log("layer", j.name, "ok");
 }
 await browser.close();

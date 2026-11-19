@@ -103,6 +103,9 @@ Write `edit.json` (reference: `docs/edit-format.md`). Rules that make it look ma
 - **One caption per scene**, in for the whole scene; switch captions only at a camera move.
 - **Let moves breathe:** 1.0–1.5 s per camera move, hold at least 1.5 s after it lands.
 - Title card 2–2.5 s, end card 3–3.5 s. Image scenes (a popup, a settings panel) 3–4 s.
+- **Cinematic touches are on by default** (`docs/edit-format.md`, "cinematic"): camera drift on holds,
+  motion blur on moves, the window's entrance, word-by-word captions. Add a `spotlights` entry for
+  the one moment that matters most in a scene (a button, an indicator), not for every scene.
 
 ## Speed
 
@@ -138,7 +141,10 @@ Always give them the `.credits.txt` beside the render, and say when its licence 
 ## Limits
 
 - Recording is macOS only (ScreenCaptureKit). Compositing and layers run anywhere.
-- Browser products only so far; a desktop app needs its own driver (accessibility scripting), but
-  the recorder (`--app <bundle id>`) and everything after it already work for any app.
+- Desktop apps: give the scenario `config.desktop = { apps: [bundle ids…], backdrop: [top, bottom] }`
+  and drive them with `api.launch`, `api.place`, `api.hold("rightOption", ms)`, `api.play(file)`,
+  `api.pointer.*` and `api.rect(name, {app, title})` (see `drive/desktop-take.mjs`). The terminal
+  needs Accessibility permission as well as Screen Recording (`reel doctor` checks both). Use
+  `"window": {"bar": 0}` in the edit: the recording already has the apps' own title bars.
 - Generating music (`reel music generate`) needs a local model wired in; ACE-Step is suggested but
   not yet tested with demo-reel.

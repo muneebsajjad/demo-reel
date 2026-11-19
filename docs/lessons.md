@@ -94,3 +94,19 @@ What a click-and-drag product with no sound changed:
   layer shots use Playwright's headless shell. Unchanged layers are not rendered again at all.
 - **macOS ships bash 3.2**, where an empty array under `set -u` is an error: `reel render` without
   `--format` failed. Expand optional arrays as `${a[@]+"${a[@]}"}`.
+
+## A desktop app (hams, a dictation app)
+
+- **The feature lived outside the browser**: hold a key in another app, speak, and the words are
+  typed there. `drive/desktop` (Swift) presses real keys (a push-to-talk modifier as a genuine
+  flagsChanged event), glides the real cursor and places windows through Accessibility; the
+  recorder takes several apps at once (`--app a,b`) and the backdrop's process (`--pid`).
+- **The person's desktop must not appear**: every other app is excluded, and a plain gradient
+  window sits behind the recorded apps. Run the app with a sample profile (`HOME=…`) so the person's
+  own history never shows.
+- **An app that listens needs a voice**: Kokoro (Sawt's model) spoke the lines; played through the
+  speakers into the real microphone, whisper transcribed them word for word. The take's sound then
+  carries the voice too.
+- **Cinematic means restraint**: motion blur, a slow drift, one entrance and a word-by-word caption
+  read as made. Spins, glitches and whooshes read as a template. Shadows shifted with `np.roll`
+  wrap round to the top of the frame: shift with a pad instead.

@@ -5,6 +5,7 @@
 //
 // A scenario is an ES module:
 //   export const config = { url, width, height, extension, app }       // all optional but url
+//   export const config = { desktop: { apps, backdrop } }               // native apps: drive/desktop-take.mjs
 //   export async function setup(api) {}    // before recording: settings, login, warm-up
 //   export async function run(api) {}      // while recording: the demo itself
 //   export async function after(api) {}    // after recording stops: extra captures (stills)
@@ -31,6 +32,11 @@ const recorder = resolve(ROOT, "recorder/record");
 if (!existsSync(recorder)) throw new Error("build the recorder first: recorder/build.sh");
 
 const scenario = await import(pathToFileURL(scenarioPath));
+if (scenario.config?.desktop) {                   // native apps instead of a browser page
+  const { desktopTake } = await import("./desktop-take.mjs");
+  await desktopTake(scenario, scenarioPath, out);
+  process.exit(0);
+}
 const cfg = { width: 1600, height: 1000, ...scenario.config };
 if (cfg.extension) cfg.extension = resolve(dirname(scenarioPath), cfg.extension);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

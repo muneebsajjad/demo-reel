@@ -104,3 +104,37 @@ def test_overflow_reports_what_a_window_cannot_show():
     assert needed == pytest.approx(2600) and allowed == pytest.approx(1134)
     assert wide.overflow({"fit": ["a"], "pad": 50}) is None
     assert wide.overflow({"cx": 100, "cy": 100, "w": 99999}) is None      # explicit shots are taken as meant
+
+# ---- drift: a held shot creeps in, and never jumps ----------------------------------------------
+def _frame():
+    return Frame(2000, 1200, 1.0, {}, {"wide": {"cx": 1000, "cy": 600, "w": 1000},
+                                       "near": {"cx": 800, "cy": 500, "w": 500}})
+
+def test_no_drift_is_the_old_camera():
+    f = _frame()
+    keys = [[0, "wide"], [2, "wide"], [3, "near"]]
+    for t in [0, 1, 2.5, 3, 5]:
+        assert f.camera(keys, t, drift=0) == f.camera(keys, t)
+
+def test_held_shot_creeps_in_then_settles():
+    f = _frame()
+    keys = [[0, "wide"]]
+    w = [f.camera(keys, t, drift=0.03)[2] for t in [0, 1, 3, 6, 10]]
+    assert w[0] == 1000
+    assert w[0] > w[1] > w[2] > w[3]                 # narrowing while it holds
+    assert w[3] == pytest.approx(970) and w[4] == pytest.approx(970)   # full creep, then still
+
+def test_drift_is_continuous_through_a_move():
+    f = _frame()
+    keys = [[0, "wide"], [4, "wide"], [5, "near"], [9, "near"]]
+    ts = [i / 100 for i in range(0, 1000)]
+    path = [f.camera(keys, t, drift=0.03) for t in ts]
+    for a, b in zip(path, path[1:]):                  # no frame-to-frame jump anywhere
+        assert abs(a[0] - b[0]) < 15 and abs(a[2] - b[2]) < 15
+    assert f.camera(keys, 5, drift=0.03) == pytest.approx(f.shot("near"))   # lands exactly on the shot
+
+def test_speed_is_zero_on_a_hold_and_high_in_a_move():
+    f = _frame()
+    keys = [[0, "wide"], [2, "wide"], [3, "near"]]
+    assert f.speed(keys, 1.0, 1 / 30) == 0
+    assert f.speed(keys, 2.5, 1 / 30) > 0.02

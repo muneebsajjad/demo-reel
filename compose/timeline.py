@@ -34,7 +34,7 @@ def build(scenes, events):
             s["camera"] = [[take_time(k, events), sh] for k, sh in s["camera"]]
             s["dur"] = sum(b - a for a, b in s["take"])
         s["start"], t = t, t + s["dur"]
-        for c in s.get("captions", []) + s.get("toasts", []):
+        for c in s.get("captions", []) + s.get("toasts", []) + s.get("spotlights", []):
             if c["until"] < 0: c["until"] += s["dur"]
     return t
 
@@ -46,6 +46,7 @@ def src_time(scene, local):
     return scene["take"][-1][1] + local
 
 # ---- shots and camera --------------------------------------------------------------------------
+DRIFT_SECONDS = 6.0                               # a held shot reaches its full creep after this long
 class Frame:
     """The page viewport of a take (width, height in px) seen through a window of `aspect`."""
     def __init__(self, page_w, page_h, aspect, rects, shots):
@@ -92,16 +93,42 @@ class Frame:
         allowed = min(self.pw, self.ph * self.aspect)
         return (w, allowed) if w > allowed * 1.02 else None
 
-    def camera(self, keys, t):
-        """Where the camera looks at take time t: eased between keys, zooming evenly in log width."""
+    def camera(self, keys, t, drift=0.0):
+        """Where the camera looks at take time t: eased between keys, zooming evenly in log width.
+
+        `drift` is how far a held shot creeps in (0.025 = 2.5% narrower after DRIFT_SECONDS), so a
+        hold never sits dead still. It eases back out over the next move, so nothing jumps."""
         keys = [(k[0], self.shot(k[1])) for k in keys]
-        if t <= keys[0][0]: return keys[0][1]
+        held = self._held(keys, t) if drift else 0
+        def tight(f, k):                          # a framing crept in by k of the drift
+            return self.clamp(f[0], f[1], f[2] * (1 - drift * k)) if k > 0 else f
+        if t <= keys[0][0]: return tight(keys[0][1], held)
         for (t0, a), (t1, b) in zip(keys, keys[1:]):
             if t <= t1:
                 u = ease((t - t0) / (t1 - t0)) if t1 > t0 else 1
+                if a == b: return tight(a, held)
+                start = self._held(keys, t0) if drift else 0   # the creep at the start of this move
+                a = tight(a, start * (1 - u))
                 w = math.exp(math.log(a[2]) + (math.log(b[2]) - math.log(a[2])) * u)
                 return self.clamp(a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, w)
-        return keys[-1][1]
+        return tight(keys[-1][1], held)
+
+    @staticmethod
+    def _held(keys, t):
+        """How far into its creep the camera is at t (0..1): it grows while the shot holds and is
+        reset by each move (which eases the creep away while it travels)."""
+        since = keys[0][0]
+        for (t0, a), (t1, b) in zip(keys, keys[1:]):
+            if t < t1: break
+            if a != b: since = t1                 # a move ended here: the next hold starts
+        hold = max(0.0, t - since)
+        x = min(1.0, hold / DRIFT_SECONDS)
+        return x * (2 - x)                        # fast, then settling: like a slow dolly
+
+    def speed(self, keys, t, dt, drift=0.0):
+        """How far the framing travels in dt, as a fraction of its width (for motion blur)."""
+        a, b = self.camera(keys, t - dt, drift), self.camera(keys, t, drift)
+        return (abs(a[0] - b[0]) + abs(a[1] - b[1]) + abs(a[2] - b[2])) / max(b[2], 1)
 
     def box(self, cx, cy, w):
         """The crop box for a framing, clamped to the page (float error must not go negative)."""

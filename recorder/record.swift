@@ -1,6 +1,10 @@
 // record: capture one app's windows and that app's sound, nothing else on the screen or speakers.
 //
-//   record --app <bundle id prefix> --out take.mov [--seconds 120] [--no-audio] [--cursor]
+//   record --app <bundle id prefix>[,<prefix>…] --out take.mov [--seconds 120] [--no-audio] [--cursor]
+//
+// Several apps (comma-separated, or --app repeated) are recorded together, for desktop demos where
+// one app acts on another; the display and "window" are those of the first app's largest window.
+//   [--pid <process id>]…   also record that process's windows (drive/desktop's backdrop)
 //   record --check-permission
 //
 // Stops when <out>.stop appears (touch it from your driver), or after --seconds.
@@ -34,19 +38,23 @@ if CommandLine.arguments.contains("--check-permission") {
     exit(ok ? 0 : 2)
 }
 
-var app = "com.google.chrome.for.testing", outPath = "take.mov", seconds = 120.0
-var audio = true, cursor = false
+var apps: [String] = [], outPath = "take.mov", seconds = 120.0
+var audio = true, cursor = false, pids: [Int32] = []
 var it = CommandLine.arguments.dropFirst().makeIterator()
 while let a = it.next() {
     switch a {
-    case "--app": app = it.next() ?? app
+    case "--app": apps += (it.next() ?? "").split(separator: ",").map { String($0) }.filter { !$0.isEmpty }
     case "--out": outPath = it.next() ?? outPath
     case "--seconds": seconds = Double(it.next() ?? "") ?? seconds
+    case "--pid": if let p = Int32(it.next() ?? "") { pids.append(p) }    // also record this process (a backdrop)
     case "--no-audio": audio = false
     case "--cursor": cursor = true
     default: fail("unknown argument \(a)")
     }
 }
+if apps.isEmpty { apps = ["com.google.chrome.for.testing"] }
+let app = apps[0]
+func included(_ id: String) -> Bool { apps.contains { id.hasPrefix($0) } }
 let out = URL(fileURLWithPath: outPath)
 try? FileManager.default.removeItem(at: out)
 let stopFile = out.path + ".stop"
@@ -65,7 +73,7 @@ guard let win = wins.max(by: { $0.frame.width * $0.frame.height < $1.frame.width
 guard let display = content.displays.first(where: { $0.frame.contains(CGPoint(x: win.frame.midX, y: win.frame.midY)) })
         ?? content.displays.first(where: { $0.frame.intersects(win.frame) }) else { fail("no display for window") }
 
-let others = content.applications.filter { !$0.bundleIdentifier.hasPrefix(app) }
+let others = content.applications.filter { !included($0.bundleIdentifier) && !pids.contains($0.processID) }
 let filter = SCContentFilter(display: display, excludingApplications: others, exceptingWindows: [])
 let scale = Double(filter.pointPixelScale)
 let cfg = SCStreamConfiguration()
@@ -84,6 +92,8 @@ let info: [String: Any] = [
     "display": ["id": display.displayID, "width": display.width, "height": display.height],
     // the window in display points; multiply by scale for pixels in the recording
     "window": ["x": f.minX - display.frame.minX, "y": f.minY - display.frame.minY, "width": f.width, "height": f.height],
+    // where the display sits in global screen points, to place other windows (desktop takes)
+    "origin": ["x": display.frame.minX, "y": display.frame.minY],
 ]
 
 final class Delegate: NSObject, SCRecordingOutputDelegate, SCStreamDelegate {

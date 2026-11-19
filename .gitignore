@@ -1,6 +1,7 @@
 node_modules/
 .demo-reel-profile/
 recorder/record
+drive/desktop
 takes/
 renders/
 examples/*/ext/

@@ -85,6 +85,15 @@ else:
                 "System Settings > Privacy & Security > Screen & System Audio Recording: turn on your terminal, then restart it")
         else:
             warn("screen recording permission", "could not check", "rebuild the recorder: recorder/build.sh")
+    drv, dsrc = ROOT / "drive/desktop", ROOT / "drive/desktop.swift"
+    if not drv.exists() or drv.stat().st_mtime < dsrc.stat().st_mtime:
+        warn("desktop driver", "not built (only needed for desktop apps)", "recorder/build.sh")
+    else:
+        code, out = run([str(drv), "--check"])
+        if code == 0: ok("desktop driver", "built; Accessibility granted")
+        else:
+            warn("desktop driver", "Accessibility not granted to this terminal (only needed for desktop apps)",
+                 "System Settings > Privacy & Security > Accessibility: turn on your terminal, then restart it")
 
 # ---- report --------------------------------------------------------------------------------------
 mark = {"ok": "ok  ", "warn": "warn", "bad": "FAIL"}

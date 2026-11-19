@@ -55,6 +55,10 @@ VX, VY = WIN["x"], WIN["y"] + WIN["bar"]
 VW, VH = WIN["w"], WIN["h"] - WIN["bar"]
 ASPECT = VW / VH
 SCENES = json.loads((LAYERS / "index.json").read_text())   # scenes with layer ids filled in
+# the touches that make it look shot rather than recorded; each can be turned off in the edit
+CINE = {"drift": 0.025, "motionBlur": True, "enter": True, "words": True, **(EDIT.get("cinematic") or {})}
+DRIFT = CINE["drift"] or 0.0
+SHUTTER = 0.5 / FPS                                   # a 180° shutter: blur over half a frame
 
 def load(path):
     return np.asarray(Image.open(path).convert("RGBA")).astype(np.float32) / 255
@@ -112,8 +116,34 @@ def take_view(si, local):
         start = max(a - XF, st - 0.1)               # a chunk may begin in the middle of a scene
         readers[(si, piece)] = Reader(start, (b + XF + 0.3) - start)
     img = readers[(si, piece)].at(st)
-    view = img.resize((VW, VH), Image.LANCZOS, box=GEO.box(*GEO.camera(s["camera"], st)), reducing_gap=2.0)
-    return np.asarray(view).astype(np.float32) / 255
+    keys = s["camera"]
+    box = GEO.box(*GEO.camera(keys, st, DRIFT))
+    view = np.asarray(img.resize((VW, VH), Image.LANCZOS, box=box, reducing_gap=2.0)).astype(np.float32) / 255
+    if CINE["motionBlur"]:
+        # a fast camera move smears like a real shutter: average a few framings across it
+        px = GEO.speed(keys, st, SHUTTER, DRIFT) * VW
+        if px > 1.5:
+            n = min(8, math.ceil(px / 1.5))
+            for i in range(1, n):
+                b = GEO.box(*GEO.camera(keys, st - SHUTTER * i / (n - 1), DRIFT))
+                view += np.asarray(img.resize((VW, VH), Image.BILINEAR, box=b)).astype(np.float32) / 255
+            view /= n
+    for sp in s.get("spotlights", []):
+        view = spotlight(view, sp, local, box)
+    return view
+
+def spotlight(view, sp, local, box):
+    """Dim the view except one rect of the take, which follows the camera."""
+    a = ease((local - sp["at"]) / sp.get("fade", 0.4)) * (1 - ease((local - sp["until"]) / sp.get("fade", 0.4)))
+    if a <= 0: return view
+    x, y, w, h = GEO.rect(sp["rect"])
+    kx, ky = VW / (box[2] - box[0]), VH / (box[3] - box[1])
+    pad = sp.get("pad", 18)
+    r = [(x - box[0]) * kx - pad, (y - box[1]) * ky - pad, (x + w - box[0]) * kx + pad, (y + h - box[1]) * ky + pad]
+    m = Image.new("L", (VW, VH), 0)
+    ImageDraw.Draw(m).rounded_rectangle(r, radius=sp.get("r", min(r[2] - r[0], r[3] - r[1]) / 2), fill=255)
+    hole = np.asarray(m.filter(ImageFilter.GaussianBlur(sp.get("soft", 10)))).astype(np.float32)[..., None] / 255
+    return view * (1 - sp.get("dim", 0.42) * a * (1 - hole))
 
 def window_with(view):
     out = BG[..., :3].copy()
@@ -122,13 +152,14 @@ def window_with(view):
 
 class Overlay:
     """A full-canvas RGBA layer kept as just the box where it has any alpha: blending a caption
-    then touches a strip of the frame, not all of it."""
-    def __init__(self, rgba):
+    then touches a strip of the frame, not all of it. `rgba` may be a crop placed at (ox, oy)."""
+    def __init__(self, rgba, ox=0, oy=0):
         ys, xs = np.nonzero(rgba[..., 3] > 0)
         if len(ys) == 0:
             self.y0 = self.y1 = self.x0 = self.x1 = 0; self.rgb = self.a = None; return
-        self.y0, self.y1, self.x0, self.x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
-        box = rgba[self.y0:self.y1, self.x0:self.x1]
+        y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
+        box = rgba[y0:y1, x0:x1]
+        self.y0, self.y1, self.x0, self.x1 = y0 + oy, y1 + oy, x0 + ox, x1 + ox
         self.rgb, self.a = np.ascontiguousarray(box[..., :3]), np.ascontiguousarray(box[..., 3:4])
 
 def over(dst, ov, alpha=1.0, dy=0):
@@ -221,10 +252,80 @@ for s in SCENES:
     for c in s.get("captions", []) + s.get("toasts", []):
         overlays[c["id"]] = Overlay(load(LAYERS / f"{c['id']}.png"))
 
+class Words:
+    """A caption whose headline comes in word by word: the rest of the layer (the kicker) plus one
+    overlay per word, cut from the layer at the boxes the layer renderer measured."""
+    STEP, FADE, RISE = 0.06, 0.32, 12
+    def __init__(self, rgba, boxes):
+        rest = rgba.copy()
+        self.words = []
+        for b in boxes:
+            x0, y0 = max(0, int(b["x"]) - 3), max(0, int(b["y"]) - 3)
+            x1, y1 = min(W, int(b["x"] + b["width"]) + 4), min(H, int(b["y"] + b["height"]) + 4)
+            self.words.append(Overlay(rgba[y0:y1, x0:x1].copy(), x0, y0))
+            rest[y0:y1, x0:x1, 3] = 0
+        self.rest = Overlay(rest)
+    def draw(self, out, t, t0, t1):
+        gone = 1 - ease((t - t1) / 0.3)
+        over(out, self.rest, ease((t - t0) / 0.35) * gone, (1 - ease((t - t0) / 0.45)) * 10)
+        for i, w in enumerate(self.words):
+            u = (t - t0 - 0.12 - i * self.STEP) / self.FADE
+            if u > 0: over(out, w, ease(u) * gone, (1 - ease(u)) * self.RISE)
+        return out
+
+words = {}
+if CINE["words"]:
+    for s in SCENES:
+        for c in s.get("captions", []):
+            f = LAYERS / f"{c['id']}.words.json"
+            if f.exists(): words[c["id"]] = Words(load(LAYERS / f"{c['id']}.png"), json.loads(f.read_text()))
+
 def behind(si):
     """The last view of the take scene before scene `si`, for an image scene to sit over."""
     j = next((j for j in range(si - 1, -1, -1) if "take" in SCENES[j]), None)
     return take_view(j, SCENES[j]["dur"] - 0.01) if j is not None else None
+
+# ---- the window's entrance: it rises in, tilted back, and settles flat --------------------------
+ENTER_DUR = 1.0
+FIRST_TAKE = next((i for i, s in enumerate(SCENES) if "take" in s), None)
+BACK = load(LAYERS / "backdrop.png")[..., :3] if (LAYERS / "backdrop.png").exists() else None
+_wm = Image.new("L", (WIN["w"], WIN["h"]), 0)
+ImageDraw.Draw(_wm).rounded_rectangle([0, 0, WIN["w"] - 1, WIN["h"] - 1], radius=WIN["r"], fill=255)
+WMASK = _wm
+
+def perspective(src_quad, dst_quad):
+    """PIL PERSPECTIVE coefficients that map output points in dst_quad back to src_quad."""
+    A, B = [], []
+    for (x, y), (u, v) in zip(dst_quad, src_quad):
+        A += [[x, y, 1, 0, 0, 0, -u * x, -u * y], [0, 0, 0, x, y, 1, -v * x, -v * y]]
+        B += [u, v]
+    return np.linalg.solve(np.array(A, float), np.array(B, float)).tolist()
+
+def entering(full, local):
+    """`full` is the finished frame; draw the window on the bare backdrop, tilted by how far in it is."""
+    e = ease(local / ENTER_DUR)
+    x, y, w, h = WIN["x"], WIN["y"], WIN["w"], WIN["h"]
+    win = Image.fromarray((full[y:y + h, x:x + w] * 255).clip(0, 255).astype(np.uint8)).convert("RGBA")
+    win.putalpha(WMASK)
+    p = 1 - e
+    s = 0.88 + 0.12 * e                                  # grows to full size
+    lift = p * 110                                       # rises from below
+    tilt = p * 0.16                                      # the top edge is further away: narrower
+    cx, top, bot = x + w / 2, y + h * (1 - s) / 2 + lift, y + h * (1 + s) / 2 + lift
+    hw_b, hw_t = w * s / 2, w * s / 2 * (1 - tilt)
+    top += p * h * 0.04                                  # foreshortened: the top comes down a little
+    dst = [(cx - hw_t, top), (cx + hw_t, top), (cx + hw_b, bot), (cx - hw_b, bot)]
+    coeffs = perspective([(0, 0), (w, 0), (w, h), (0, h)], dst)
+    layer = win.transform((W, H), Image.PERSPECTIVE, coeffs, Image.BICUBIC)
+    rgba = np.asarray(layer).astype(np.float32) / 255
+    alpha = rgba[..., 3:4] * ease(local / 0.45)
+    shadow = np.asarray(Image.fromarray((alpha[..., 0] * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(30))
+                        ).astype(np.float32)[..., None] / 255
+    shadow = np.concatenate([np.zeros_like(shadow[:28]), shadow[:-28]]) * 0.32     # moved down, not wrapped
+    out = BACK * (1 - shadow)
+    out = out * (1 - alpha) + rgba[..., :3] * alpha
+    k = ease((e - 0.8) / 0.2)                            # hand over to the real frame (its own shadow)
+    return out * (1 - k) + full * k
 
 def scene_frame(si, local):
     s = SCENES[si]
@@ -233,7 +334,10 @@ def scene_frame(si, local):
         if si == len(SCENES) - 1: return push(cards[s["card"]], 1 + k - k * ease(local / 1.2))
         return push(cards[s["card"]], 1 + k * ease(local / s["dur"]))
     if "take" in s:
-        return window_with(take_view(si, local))
+        full = window_with(take_view(si, local))
+        if CINE["enter"] and si == FIRST_TAKE and BACK is not None and local < ENTER_DUR:
+            return entering(full, max(0, local))
+        return full
     img = images[si]
     return img.frame(local, behind(si) if img.backdrop is None else None)
 
@@ -271,6 +375,7 @@ def frame(t):
         for c in s.get("captions", []):
             t0, t1 = s["start"] + c["at"], s["start"] + c["until"]
             if t0 <= t <= t1 + 0.3:
+                if c["id"] in words: out = words[c["id"]].draw(out, t, t0, t1); continue
                 a = ease((t - t0) / 0.45) * (1 - ease((t - t1) / 0.3))
                 if a > 0: out = over(out, overlays[c["id"]], a, (1 - ease((t - t0) / 0.5)) * 18)
         for c in s.get("toasts", []):

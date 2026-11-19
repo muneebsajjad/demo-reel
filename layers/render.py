@@ -85,7 +85,7 @@ def render(edit_path, fmt=None):
         shutil.copy(base / brand["logo"], out / pathlib.Path(brand["logo"]).name)
         brand = {**brand, "logo": pathlib.Path(brand["logo"]).name}
 
-    jobs = {"bg": TEMPLATES["window"](edit, brand, size)}
+    jobs = {"bg": TEMPLATES["window"](edit, brand, size), "backdrop": TEMPLATES["backdrop"](edit, brand, size)}
     for s in edit["scenes"]:
         if s.get("card"):
             jobs[s["card"]] = TEMPLATES[s["card"]](s, brand, size) if s["card"] in TEMPLATES else None
@@ -113,10 +113,13 @@ def render(edit_path, fmt=None):
         f = out / f"{name}.html"
         html_text = page(css, body, brand, size)
         png = out / f"{name}.png"
-        if f.exists() and png.exists() and f.read_text() == html_text and png.stat().st_mtime >= f.stat().st_mtime:
+        fresh = not name.startswith("cap-") or (out / f"{name}.words.json").exists()
+        if fresh and f.exists() and png.exists() and f.read_text() == html_text and png.stat().st_mtime >= f.stat().st_mtime:
             skipped += 1; continue                  # unchanged since the last render
         f.write_text(html_text)
-        todo.append(dict(name=name, html=str(f), png=str(png), width=size[0], height=size[1]))
+        todo.append(dict(name=name, html=str(f), png=str(png), width=size[0], height=size[1],
+                         # where each headline word sits, for the word-by-word reveal
+                         words=str(out / f"{name}.words.json") if name.startswith("cap-") else None))
     shoot(exe, todo)
     if skipped: print(f"{skipped} layer{'s' * (skipped != 1)} unchanged")
     # the compositor reads ids back from here
